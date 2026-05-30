@@ -441,6 +441,7 @@ namespace GorillaCaster
             switch (cmd)
             {
                 case "mode": CycleMode(); break;
+                case "free": SetMode(CamMode.FreeCam); break;
                 case "fov+": _fov = Mathf.Clamp(_fov + 5f, 10f, 120f); break;
                 case "fov-": _fov = Mathf.Clamp(_fov - 5f, 10f, 120f); break;
                 case "view": _goPro.Viewfinder = !_goPro.Viewfinder; break;
