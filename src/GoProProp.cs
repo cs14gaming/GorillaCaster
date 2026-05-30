@@ -18,7 +18,7 @@ namespace GorillaCaster
         public bool Spawned => Root != null;
         public bool Viewfinder = true;
 
-        public Action OnRecord, OnPlay, OnCycleMode, OnToggleView, OnFovUp, OnFovDown, OnTime, OnHide;
+        public Action OnRecord, OnPlay, OnCycleMode, OnToggleView, OnFovUp, OnFovDown, OnTime, OnHide, OnDirector;
         public Func<string> StatusText;
         public Func<bool> IsRecording;
 
@@ -76,15 +76,17 @@ namespace GorillaCaster
             BuildViewfinder(vf);
 
             // right-side control panel
-            float bx = 0.064f;
-            _status = Label(Root.transform, new Vector3(bx, 0.062f, fz - 0.0006f), "READY", 0.0013f, new Color(0.78f, 0.88f, 1f));
-            AddButton(bx, 0.044f, 0.036f, 0.013f, "● REC", new Color(0.82f, 0.21f, 0.27f), () => OnRecord?.Invoke());
-            AddButton(bx, 0.014f, 0.036f, 0.013f, "MODE", Panel(), () => OnCycleMode?.Invoke());
-            AddButton(0.042f, -0.016f, 0.016f, 0.013f, "FOV-", Panel(), () => OnFovDown?.Invoke());
-            AddButton(0.086f, -0.016f, 0.016f, 0.013f, "FOV+", Panel(), () => OnFovUp?.Invoke());
-            AddButton(bx, -0.046f, 0.036f, 0.013f, "VIEW", Panel(), () => OnToggleView?.Invoke());
-            AddButton(0.042f, -0.064f, 0.016f, 0.011f, "TIME", Panel(), () => OnTime?.Invoke());
-            AddButton(0.086f, -0.064f, 0.016f, 0.011f, "HUD", Panel(), () => OnHide?.Invoke());
+            float bx = 0.064f, l = 0.042f, rcol = 0.086f, hy = 0.0094f;
+            _status = Label(Root.transform, new Vector3(bx, 0.064f, fz - 0.0006f), "READY", 0.0012f, new Color(0.78f, 0.88f, 1f));
+            AddButton(bx, 0.050f, 0.036f, hy, "● REC", new Color(0.82f, 0.21f, 0.27f), () => OnRecord?.Invoke());
+            AddButton(bx, 0.028f, 0.036f, hy, "MODE", Panel(), () => OnCycleMode?.Invoke());
+            AddButton(bx, 0.006f, 0.036f, hy, "PLAY", new Color(0.20f, 0.42f, 0.30f), () => OnPlay?.Invoke());
+            AddButton(l, -0.016f, 0.016f, hy, "FOV-", Panel(), () => OnFovDown?.Invoke());
+            AddButton(rcol, -0.016f, 0.016f, hy, "FOV+", Panel(), () => OnFovUp?.Invoke());
+            AddButton(l, -0.038f, 0.016f, hy, "VIEW", Panel(), () => OnToggleView?.Invoke());
+            AddButton(rcol, -0.038f, 0.016f, hy, "DIR", new Color(0.30f, 0.26f, 0.5f), () => OnDirector?.Invoke());
+            AddButton(l, -0.060f, 0.016f, hy, "TIME", Panel(), () => OnTime?.Invoke());
+            AddButton(rcol, -0.060f, 0.016f, hy, "HUD", Panel(), () => OnHide?.Invoke());
             Held = false;
         }
 

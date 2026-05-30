@@ -1,9 +1,14 @@
-# GorillaCaster
+# Spooder's Camera Mod (GorillaCaster)
 
-A casting / spectator camera mod for **Gorilla Tag** (PC Steam, BepInEx 5) — the kind of
-tool casters and channels like *The Tree Trotters* use to film matches. It drives the game's
-desktop third-person / shoulder camera (the view that shows on your monitor while you're in
-VR), so your headset view is never touched. Point OBS at the game window and cast.
+The most complete casting / spectator camera mod for **Gorilla Tag** (PC Steam, BepInEx 5) —
+built to out-feature the popular paid cam mods. It drives the game's desktop third-person /
+shoulder camera (the view on your monitor while you're in VR), so your headset view is never
+touched. Point OBS at the game window and cast.
+
+**Highlights:** a smooth in-VR control **tablet** (operate everything without the PC),
+**competitive round timer + scoreboard**, **color-grade filters**, **aspect framing guides**,
+**camera presets**, **auto-director**, **killcam** auto-replays, **instant replay** with slow-mo,
+6 camera modes, cinematic **dolly paths**, premium overlays, and full obfuscation.
 
 ## Features
 
@@ -24,6 +29,13 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
 - **Instant Replay** – continuously buffers every player's motion, then replays it so you can
   rewind, **slow-mo** (0.1–2×), and scrub a moment — while flying the camera freely. `F6`
   record, `F7` play/stop, drag the on-screen bar to scrub.
+- **Killcam** – auto-replays the moment someone gets tagged, in slow-mo (configurable length/speed).
+- **Competitive overlay** – Infection **round timer** (3:00 cap with colour states) + live
+  **scoreboard** (survivors vs infected, who's IT), plus optional manual **team scores**.
+- **Color grade & framing** – 8 filter looks + strength, vignette, **aspect guides**
+  (16:9 / 2.39 / 4:3 / 9:16 / 1:1) with letterboxing, rule-of-thirds grid, center crosshair.
+- **Camera presets** – one-tap camera+look setups saved as human-editable JSON; cycle with `[ ]`.
+- **Auto-director** – automatically frames the survivor about to be tagged.
 - **Cinematic Dolly / Director** – drop keyframes from the current camera (`K`), then `Play`
   (`L`) for a smooth Catmull-Rom camera move. Adjustable speed, optional loop.
 - **Player switching** – `1`–`0` to jump to a player, `N`/`B` to cycle, or click in the
@@ -55,8 +67,13 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
 | `Q` / `E` | Orbit target left / right (Follow mode) |
 | `K` / `L` | Add dolly keyframe / play-stop dolly |
 | `F6` / `F7` | Replay record / play-stop |
+| `[` / `]` | Previous / next preset |
+| `F1` | Hotkey cheatsheet |
 | `F8` | Hide all overlays (clean capture) |
 | `F11` | Screenshot |
+
+The in-VR **tablet** (Tablet tab → Spawn) mirrors all of this: REC · MODE · PLAY · FOV± · VIEW ·
+DIR · TIME · HUD, plus a live viewfinder — so you can cast entirely from inside VR.
 
 (Menu / mode / screenshot keys are remappable in the config file.)
 
@@ -102,10 +119,14 @@ runtime errors.
 | `src/DollyPath.cs` | Keyframed Catmull-Rom director path |
 | `src/ReplayRecorder.cs` | Instant-replay buffer + playback |
 | `src/HudExtras.cs` | Nametags, minimap, watermark, velocity, helpers |
+| `src/CompHud.cs` | Competitive round timer + scoreboard |
+| `src/Filters.cs` | Colour grade, vignette, aspect guides, thirds grid |
+| `src/Presets.cs` | JSON camera/look presets |
 | `src/Styles.cs` | Premium IMGUI theme |
-| `src/TextureGen.cs` | Runtime rounded-rect / shadow textures |
+| `src/TextureGen.cs` | Runtime rounded-rect / shadow / vignette textures |
 | `src/UI.cs` | Themed widgets (sliders, switches, buttons) |
 | `obfuscar.xml`, `pack.ps1` | Obfuscation config + release packaging |
+| `icon.png` | Thunderstore package icon |
 
 > Use it for content creation / casting in private & modded lobbies, per Gorilla Tag's
 > modding policy. Don't use mods in public matchmaking.

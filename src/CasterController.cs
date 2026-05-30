@@ -75,6 +75,12 @@ namespace GorillaCaster
         // auto-director
         private bool _autoDirector;
 
+        // killcam / help / framing
+        private bool _killcam;
+        private int _kcPrev = -1;
+        private float _kcCooldown, _kcSeconds = 5f, _kcSpeed = 0.5f;
+        private bool _cheatsheet, _crosshair;
+
         // toggles
         private bool _menuOpen;
         private bool _autoCast;
@@ -187,6 +193,8 @@ namespace GorillaCaster
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             HudExtras.NametagScale = _nametagScale;
+            if (Pressed(Key.F1)) _cheatsheet = !_cheatsheet;
+            UpdateKillcam();
 
             if (_autoDirector) AutoDirect();
             else if (_autoCast) AutoPickTarget();
@@ -355,6 +363,22 @@ namespace GorillaCaster
             else if (anyInfected != null) _target = anyInfected;
         }
 
+        // Auto-replay the moment someone gets tagged, in slow-mo.
+        private void UpdateKillcam()
+        {
+            if (!_killcam) { _kcPrev = -1; return; }
+            if (!_replay.Recording) _replay.StartRecording();
+            int tagged = 0;
+            for (int i = 0; i < _rigs.Count; i++) if (CasterUtil.IsTagged(_rigs[i])) tagged++;
+            if (_kcPrev >= 0 && tagged > _kcPrev && !_replay.Playing && Time.time > _kcCooldown && _replay.Length > 2f)
+            {
+                _replay.Speed = _kcSpeed;
+                _replay.Play(Mathf.Max(0f, _replay.Length - _kcSeconds));
+                _kcCooldown = Time.time + 7f;
+            }
+            _kcPrev = tagged;
+        }
+
         // ----- presets -----
         private void CyclePreset(int dir)
         {
@@ -414,6 +438,7 @@ namespace GorillaCaster
             _goPro.OnFovDown = () => _fov = Mathf.Clamp(_fov - 5f, 10f, 120f);
             _goPro.OnTime = CycleTimeOfDay;
             _goPro.OnHide = () => _hudHidden = !_hudHidden;
+            _goPro.OnDirector = () => _autoDirector = !_autoDirector;
             _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°" + (_replay.Recording ? "   REC" : "");
             _goPro.IsRecording = () => _replay.Recording;
         }
@@ -470,9 +495,11 @@ namespace GorillaCaster
                     if (_playerList) DrawPlayerList();
                     _comp.Draw(_rigs);
                     if (_lowerThird && _target != null) DrawLowerThird();
+                    if (_crosshair) DrawCrosshair();
                     if (_replay.Recording) DrawRecIndicator();
                     if (_replay.Playing || _replay.Length > 0.01f) DrawReplayBar();
                 }
+                if (_cheatsheet) DrawCheatsheet();
                 if (_menuOpen) _winRect = GUI.Window(0xCA57, _winRect, DrawWindow, "");
             }
             catch (Exception e) { Debug.LogWarning("[GorillaCaster] OnGUI: " + e.Message); }
@@ -519,6 +546,48 @@ namespace GorillaCaster
             GUI.Label(new Rect(r.x + 24, r.y + 8, r.width - 30, 30), CasterUtil.NameOf(_target), Styles.LowerThirdName);
             string sub = it ? "<color=#ff4d8d>● IT</color>   NOW CASTING" : "NOW CASTING";
             GUI.Label(new Rect(r.x + 24, r.y + 38, r.width - 30, 20), sub, Styles.LowerThirdSub);
+        }
+
+        private void DrawCrosshair()
+        {
+            Rect f = Filters.FrameRect(_aspect);
+            float cx = f.center.x, cy = f.center.y;
+            var c = new Color(1, 1, 1, 0.5f);
+            Styles.Fill(new Rect(cx - 1, cy - 7, 2, 5), c);
+            Styles.Fill(new Rect(cx - 1, cy + 2, 2, 5), c);
+            Styles.Fill(new Rect(cx - 7, cy - 1, 5, 2), c);
+            Styles.Fill(new Rect(cx + 2, cy - 1, 5, 2), c);
+            Styles.Round(new Rect(cx - 1.5f, cy - 1.5f, 3, 3), Styles.Accent, 1.5f);
+        }
+
+        private static readonly string[][] CheatRows =
+        {
+            new[]{ "Right Ctrl", "Open / close menu" },
+            new[]{ "P", "Cycle camera mode" },
+            new[]{ "1-0 / N / B", "Cast player / cycle" },
+            new[]{ "Q / E", "Orbit (Follow)" },
+            new[]{ "K / L", "Dolly keyframe / play" },
+            new[]{ "F6 / F7", "Replay record / play" },
+            new[]{ "[ / ]", "Previous / next preset" },
+            new[]{ "F8", "Hide all overlays" },
+            new[]{ "F1", "This cheatsheet" },
+            new[]{ "F11", "Screenshot" },
+        };
+
+        private void DrawCheatsheet()
+        {
+            float w = 320, h = 30 + CheatRows.Length * 22 + 12;
+            var r = new Rect(Screen.width - w - 16, (Screen.height - h) / 2f, w, h);
+            Styles.DrawCard(r, new Color(0.07f, 0.08f, 0.10f, 0.95f), 10f);
+            Styles.Round(new Rect(r.x, r.y, r.width, 3), Styles.Accent, 1.5f);
+            GUI.Label(new Rect(r.x + 14, r.y + 8, r.width, 18), "HOTKEYS  <size=10>· F1</size>", Styles.Header);
+            float y = r.y + 32;
+            foreach (var row in CheatRows)
+            {
+                GUI.Label(new Rect(r.x + 14, y, 110, 18), row[0], new GUIStyle(Styles.Hud) { fontSize = 12 });
+                GUI.Label(new Rect(r.x + 128, y, w - 138, 18), row[1], new GUIStyle(Styles.Sub) { fontSize = 12 });
+                y += 22;
+            }
         }
 
         private void DrawRecIndicator()
@@ -714,6 +783,15 @@ namespace GorillaCaster
 
             _replay.BufferSeconds = UI.Slider("Buffer length (s)", _replay.BufferSeconds, 5f, 90f, "0");
             UI.Note("During playback, drag the bar at the bottom of the screen to scrub.");
+
+            UI.Header("Killcam");
+            _killcam = UI.Toggle("Auto slow-mo replay on every tag", _killcam);
+            if (_killcam)
+            {
+                _kcSeconds = UI.Slider("Clip length (s)", _kcSeconds, 2f, 12f, "0");
+                _kcSpeed = UI.Slider("Slow-mo speed", _kcSpeed, 0.1f, 1f);
+                UI.Note("Keeps recording and auto-replays the moment someone is tagged.");
+            }
         }
 
         private void DirectorTab()
@@ -835,6 +913,8 @@ namespace GorillaCaster
             _minimap = UI.Toggle("Overhead minimap", _minimap);
             _hud = UI.Toggle("FPS / mode / speed readout", _hud);
             _letterbox = UI.Toggle("Cinematic letterbox bars", _letterbox);
+            _crosshair = UI.Toggle("Center crosshair (framing)", _crosshair);
+            _cheatsheet = UI.Toggle("Hotkey cheatsheet (F1)", _cheatsheet);
             _nametagScale = UI.Slider("Nametag size", _nametagScale, 0.6f, 1.8f);
 
             UI.Header("Watermark");
