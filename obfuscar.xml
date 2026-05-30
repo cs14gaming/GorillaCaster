@@ -24,5 +24,9 @@
     <SkipMethod type="GorillaCaster.CasterController" name="OnGUI" />
     <SkipMethod type="GorillaCaster.CasterController" name="OnDestroy" />
     <SkipMethod type="GorillaCaster.Plugin" name="Awake" />
+
+    <!-- JSON-serialized preset classes: keep field names so presets.json stays human-editable -->
+    <SkipType name="GorillaCaster.CamPreset" skipFields="true" skipProperties="true" />
+    <SkipType name="GorillaCaster.PresetFile" skipFields="true" skipProperties="true" />
   </Module>
 </Obfuscator>

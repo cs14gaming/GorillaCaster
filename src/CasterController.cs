@@ -20,9 +20,9 @@ namespace GorillaCaster
         private enum CamMode { Follow, FreeCam, FirstPerson, GoPro, Tripod, Selfie }
 
         private static readonly string[] ModeNames =
-            { "Follow", "FreeCam", "First Person", "Phone", "Tripod", "Selfie" };
+            { "Follow", "FreeCam", "First Person", "Tablet", "Tripod", "Selfie" };
         private static readonly string[] TabNames =
-            { "Camera", "Phone", "Players", "Replay", "Director", "World", "Overlays" };
+            { "Camera", "Tablet", "Players", "Comp", "Replay", "Director", "Look", "World", "Overlays", "Presets" };
 
         // ---- camera ----
         private Camera _cam;
@@ -60,6 +60,20 @@ namespace GorillaCaster
         private readonly DollyPath _dolly = new DollyPath();
         private readonly ReplayRecorder _replay = new ReplayRecorder();
         private readonly GoProProp _goPro = new GoProProp();
+        private readonly CompHud _comp = new CompHud();
+
+        // look / grading
+        private int _filter, _aspect;
+        private float _filterStrength = 0.85f, _vignette = 0f;
+        private bool _thirds;
+
+        // presets
+        private List<CamPreset> _presets;
+        private int _presetIdx;
+        private string _newPresetName = "My Preset";
+
+        // auto-director
+        private bool _autoDirector;
 
         // toggles
         private bool _menuOpen;
@@ -99,6 +113,7 @@ namespace GorillaCaster
                 if (Plugin.WatermarkText != null) _watermarkText = Plugin.WatermarkText.Value;
                 if (Plugin.WatermarkOpacity != null) _watermarkOpacity = Plugin.WatermarkOpacity.Value;
                 WirePhone();
+                _presets = Presets.Load();
             }
             catch { }
         }
@@ -164,12 +179,17 @@ namespace GorillaCaster
             if (_keepAfk && PhotonNetworkController.Instance != null)
                 PhotonNetworkController.Instance.disableAFKKick = true;
 
+            if (Pressed(Key.LeftBracket)) CyclePreset(-1);
+            if (Pressed(Key.RightBracket)) CyclePreset(1);
+
             RefreshRigs();
             _replay.Sample(_rigs, Time.deltaTime);
             _goPro.Tick(_fov);
+            _comp.Update(Time.deltaTime, _rigs);
             HudExtras.NametagScale = _nametagScale;
 
-            if (_autoCast) AutoPickTarget();
+            if (_autoDirector) AutoDirect();
+            else if (_autoCast) AutoPickTarget();
             if (_target == null && _rigs.Count > 0) _target = _rigs[0];
         }
 
@@ -314,6 +334,62 @@ namespace GorillaCaster
 
         private void AutoPickTarget() { foreach (var r in _rigs) if (CasterUtil.IsTagged(r)) { _target = r; return; } }
 
+        // Frame the action: cast the survivor closest to an infected (the likely next tag).
+        private void AutoDirect()
+        {
+            VRRig bestSurvivor = null, anyInfected = null;
+            float best = float.MaxValue;
+            for (int i = 0; i < _rigs.Count; i++)
+            {
+                var s = _rigs[i];
+                if (s == null || CasterUtil.IsTagged(s)) { if (s != null && CasterUtil.IsTagged(s)) anyInfected = s; continue; }
+                for (int j = 0; j < _rigs.Count; j++)
+                {
+                    var inf = _rigs[j];
+                    if (inf == null || !CasterUtil.IsTagged(inf)) continue;
+                    float d = Vector3.Distance(CasterUtil.HeadPos(s), CasterUtil.HeadPos(inf));
+                    if (d < best) { best = d; bestSurvivor = s; }
+                }
+            }
+            if (bestSurvivor != null) _target = bestSurvivor;
+            else if (anyInfected != null) _target = anyInfected;
+        }
+
+        // ----- presets -----
+        private void CyclePreset(int dir)
+        {
+            if (_presets == null || _presets.Count == 0) return;
+            _presetIdx = ((_presetIdx + dir) % _presets.Count + _presets.Count) % _presets.Count;
+            ApplyPreset(_presets[_presetIdx]);
+        }
+
+        private void ApplyPreset(CamPreset p)
+        {
+            if (p == null) return;
+            _fov = p.fov; _nearClip = p.nearClip;
+            _followDistance = p.followDist; _followHeight = p.followHeight;
+            _moveSmoothing = p.moveSmooth; _rotSmoothing = p.rotSmooth;
+            SetMode((CamMode)Mathf.Clamp(p.mode, 0, ModeNames.Length - 1));
+            _filter = p.filter; _filterStrength = p.filterStrength; _vignette = p.vignette; _aspect = p.aspect; _thirds = p.thirds;
+            _nametags = p.nametags; _lowerThird = p.lowerThird; _minimap = p.minimap; _letterbox = p.letterbox;
+        }
+
+        private CamPreset Capture(string name) => new CamPreset
+        {
+            name = name, fov = _fov, nearClip = _nearClip, followDist = _followDistance, followHeight = _followHeight,
+            moveSmooth = _moveSmoothing, rotSmooth = _rotSmoothing, mode = (int)_mode,
+            filter = _filter, filterStrength = _filterStrength, vignette = _vignette, aspect = _aspect, thirds = _thirds,
+            nametags = _nametags, lowerThird = _lowerThird, minimap = _minimap, letterbox = _letterbox
+        };
+
+        private void SaveCurrentAsNew()
+        {
+            if (_presets == null) _presets = new List<CamPreset>();
+            _presets.Add(Capture(string.IsNullOrEmpty(_newPresetName) ? "Preset " + (_presets.Count + 1) : _newPresetName));
+            _presetIdx = _presets.Count - 1;
+            Presets.Save(_presets);
+        }
+
         private void SetMode(CamMode m)
         {
             _mode = m; _freeInit = false;
@@ -383,6 +459,7 @@ namespace GorillaCaster
             try
             {
                 Styles.Ensure();
+                Filters.Draw(_filter, _filterStrength, _vignette, _aspect, _thirds && !_hudHidden);
                 if (_letterbox) DrawLetterbox();
                 if (_watermark) HudExtras.DrawWatermark(_watermarkText, _watermarkOpacity);
                 if (!_hudHidden)
@@ -391,6 +468,7 @@ namespace GorillaCaster
                     if (_minimap) HudExtras.DrawMinimap(new Rect(Screen.width - 210, 40, 200, 160), _rigs, _target);
                     if (_hud) DrawHud();
                     if (_playerList) DrawPlayerList();
+                    _comp.Draw(_rigs);
                     if (_lowerThird && _target != null) DrawLowerThird();
                     if (_replay.Recording) DrawRecIndicator();
                     if (_replay.Playing || _replay.Length > 0.01f) DrawReplayBar();
@@ -498,10 +576,13 @@ namespace GorillaCaster
                 case 0: CameraTab(); break;
                 case 1: GoProTab(); break;
                 case 2: PlayersTab(); break;
-                case 3: ReplayTab(); break;
-                case 4: DirectorTab(); break;
-                case 5: WorldTab(); break;
-                case 6: OverlaysTab(); break;
+                case 3: CompTab(); break;
+                case 4: ReplayTab(); break;
+                case 5: DirectorTab(); break;
+                case 6: LookTab(); break;
+                case 7: WorldTab(); break;
+                case 8: OverlaysTab(); break;
+                case 9: PresetsTab(); break;
             }
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -588,7 +669,9 @@ namespace GorillaCaster
 
         private void PlayersTab()
         {
+            _autoDirector = UI.Toggle("Auto-director (frame the action)", _autoDirector);
             _autoCast = UI.Toggle("Auto-cast the tagged player", _autoCast);
+            if (_autoDirector) UI.Note("Automatically casts the survivor about to be tagged — the most exciting angle.");
             UI.Header("Cast  ·  1-0 / N / B");
             _playerScroll = GUILayout.BeginScrollView(_playerScroll, GUILayout.Height(300));
             for (int i = 0; i < _rigs.Count; i++)
@@ -673,6 +756,73 @@ namespace GorillaCaster
             if (UI.SmallButton("Leave", 70)) LeaveRoom();
             GUILayout.EndHorizontal();
             _keepAfk = UI.Toggle("Disable AFK kick", _keepAfk);
+        }
+
+        private void CompTab()
+        {
+            UI.Header("Competitive Overlay");
+            _comp.ShowTimer = UI.Toggle("Round timer (3:00 cap)", _comp.ShowTimer);
+            _comp.ShowScoreboard = UI.Toggle("Scoreboard (survivors / infected)", _comp.ShowScoreboard);
+            _comp.AutoTimer = UI.Toggle("Auto start/stop timer", _comp.AutoTimer);
+            UI.Note("Reads live infection state. Timer auto-starts on first tag and ends on a wipe or the 3:00 cap.");
+
+            UI.Header("Timer (manual)");
+            GUILayout.BeginHorizontal();
+            if (UI.SmallButton(_comp.Running ? "Stop" : "Start", 90)) { if (_comp.Running) _comp.StopTimer(); else _comp.StartTimer(); }
+            if (UI.SmallButton("Reset", 90)) _comp.ResetTimer();
+            GUILayout.EndHorizontal();
+
+            UI.Header("Team Scores");
+            _comp.ShowTeams = UI.Toggle("Show team scores", _comp.ShowTeams);
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("A", Styles.Label, GUILayout.Width(14));
+            if (UI.SmallButton("-", 40)) _comp.TeamA = Mathf.Max(0, _comp.TeamA - 1);
+            GUILayout.Label(_comp.TeamA.ToString(), Styles.Value, GUILayout.Width(28));
+            if (UI.SmallButton("+", 40)) _comp.TeamA++;
+            GUILayout.Space(10);
+            GUILayout.Label("B", Styles.Label, GUILayout.Width(14));
+            if (UI.SmallButton("-", 40)) _comp.TeamB = Mathf.Max(0, _comp.TeamB - 1);
+            GUILayout.Label(_comp.TeamB.ToString(), Styles.Value, GUILayout.Width(28));
+            if (UI.SmallButton("+", 40)) _comp.TeamB++;
+            GUILayout.EndHorizontal();
+        }
+
+        private void LookTab()
+        {
+            UI.Header("Color Grade");
+            _filter = GUILayout.SelectionGrid(_filter, Filters.Names, 4, Styles.BtnS, GUILayout.Height(56));
+            _filterStrength = UI.Slider("Filter strength", _filterStrength, 0f, 1f);
+            _vignette = UI.Slider("Vignette", _vignette, 0f, 1f);
+
+            UI.Header("Framing");
+            _aspect = GUILayout.SelectionGrid(_aspect, Filters.AspectNames, 3, Styles.BtnS, GUILayout.Height(56));
+            _thirds = UI.Toggle("Rule-of-thirds grid", _thirds);
+            UI.Note("Aspect guides letterbox/pillarbox the view for cinematic or vertical clips. Grade & vignette apply to the broadcast (monitor) only.");
+        }
+
+        private void PresetsTab()
+        {
+            UI.Header("Presets  ·  [ ]");
+            UI.Note("One-tap camera + look setups. Saved to BepInEx/config/GorillaCaster_presets.json — edit them by hand too.");
+            if (_presets != null)
+            {
+                for (int i = 0; i < _presets.Count; i++)
+                {
+                    var p = _presets[i];
+                    bool sel = i == _presetIdx;
+                    var st = new GUIStyle(Styles.BtnS); if (sel) st.normal.textColor = new Color(0.36f, 0.94f, 0.54f);
+                    if (GUILayout.Button((sel ? "● " : "") + p.name, st, GUILayout.Height(28))) { _presetIdx = i; ApplyPreset(p); }
+                }
+            }
+            UI.Header("Save current");
+            GUILayout.BeginHorizontal();
+            _newPresetName = GUILayout.TextField(_newPresetName, 28, GUILayout.Height(26));
+            if (UI.SmallButton("Save", 70)) SaveCurrentAsNew();
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (UI.SmallButton("Reload file", 110)) { _presets = Presets.Load(); }
+            if (_presets != null && _presets.Count > 0 && UI.SmallButton("Delete", 90)) { _presets.RemoveAt(Mathf.Clamp(_presetIdx, 0, _presets.Count - 1)); Presets.Save(_presets); _presetIdx = 0; }
+            GUILayout.EndHorizontal();
         }
 
         private void OverlaysTab()

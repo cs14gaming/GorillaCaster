@@ -55,6 +55,25 @@ namespace GorillaCaster
 
         public static Texture2D Circle(int size, Color col) => RoundedRect(size, size / 2, col);
 
+        /// <summary>Vignette: transparent centre fading to opaque dark at the edges/corners.</summary>
+        public static Texture2D Vignette(int size, Color edge)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float c = (size - 1) / 2f;
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float nx = (x - c) / c, ny = (y - c) / c;
+                float d = Mathf.Sqrt(nx * nx + ny * ny) / 1.41421f; // 0 centre .. 1 corner
+                float a = Mathf.Clamp01((d - 0.45f) / 0.55f);
+                a = a * a;
+                t.SetPixel(x, y, new Color(edge.r, edge.g, edge.b, edge.a * a));
+            }
+            t.Apply();
+            t.hideFlags = HideFlags.HideAndDontSave; t.wrapMode = TextureWrapMode.Clamp; t.filterMode = FilterMode.Bilinear;
+            return t;
+        }
+
         /// <summary>Soft radial shadow blob (opaque centre fading to transparent).</summary>
         public static Texture2D SoftShadow(int size, Color col)
         {
