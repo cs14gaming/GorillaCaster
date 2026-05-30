@@ -199,11 +199,16 @@ namespace GorillaCaster
             if (cip != null)
             {
                 bool a = cip.rightControllerPrimaryButton;
-                if (a && !_aPrev) { if (_goPro.Spawned) _goPro.Despawn(); else _goPro.SummonToHand(); }
+                if (a && !_aPrev)
+                {
+                    if (_goPro.Spawned) { _goPro.Despawn(); SetMode(CamMode.FirstPerson); }
+                    else { _goPro.SummonToHand(); SetMode(CamMode.GoPro); }
+                }
                 _aPrev = a;
             }
 
             RefreshRigs();
+            _goPro.CastingCam = _cam;
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             VrNametags.Enabled = _vrNametags; VrNametags.ShowVelocity = _vrNametagVel; VrNametags.Size = _vrNametagSize;
@@ -297,9 +302,7 @@ namespace GorillaCaster
             // dutch / roll tilt
             if (Mathf.Abs(_roll) > 0.01f) desiredRot = desiredRot * Quaternion.Euler(0, 0, _roll);
 
-            float pk, rk;
-            if (_mode == CamMode.FirstPerson) { pk = SmoothK(0.05f); rk = SmoothK(0.10f); }   // tight + responsive
-            else { pk = SmoothK(_moveSmoothing); rk = SmoothK(_rotSmoothing); }
+            float pk = SmoothK(_moveSmoothing), rk = SmoothK(_rotSmoothing);
             _cam.transform.position = Vector3.Lerp(_cam.transform.position, desiredPos, pk);
             _cam.transform.rotation = Quaternion.Slerp(_cam.transform.rotation, desiredRot, rk);
         }

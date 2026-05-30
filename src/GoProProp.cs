@@ -6,9 +6,9 @@ using UnityEngine.UI;
 namespace GorillaCaster
 {
     /// <summary>
-    /// The in-VR camera phone. Two pages: a CAMERA page (First-Person / Selfie + FOV / smoothing +
-    /// shot) and a MOD-CHECK board. Grab with grip, point your right-hand fingertip laser and pull
-    /// trigger. Free 6DOF. Lives on the UI layer (excluded from the broadcast + preview cameras).
+    /// The in-VR camera phone (Sakuraa-style): wide, screen on the right mirroring the live BROADCAST
+    /// camera, a pink button grid on the left (First Person / Selfie / FOV / smoothing / shot / mods),
+    /// and a MOD-CHECK board page. Grab with grip, aim the right-hand fingertip laser, pull trigger.
     /// </summary>
     internal class GoProProp
     {
@@ -17,6 +17,7 @@ namespace GorillaCaster
         public bool Held { get; private set; }
         public bool Spawned => Root != null;
         public bool Viewfinder = true;
+        public Camera CastingCam;   // the live broadcast camera the screen mirrors
 
         public Action<string> OnCommand;
         public Func<string> StatusText;
@@ -47,7 +48,10 @@ namespace GorillaCaster
         private const float GrabRadius = 0.42f;
         private const int UiLayer = 5;
         public int Layer => UiLayer;
-        private const float CW = 780f, CH = 470f, S = 0.00052f;
+        private const float CW = 940f, CH = 470f, S = 0.00050f;   // wider
+
+        private static readonly Color Pink = new Color(0.84f, 0.30f, 0.58f);
+        private static readonly Color PinkDim = new Color(0.55f, 0.22f, 0.42f);
 
         private class Btn { public RectTransform rt; public Image img; public Vector2 c, half; public Action act; public Color col; public int page; public float scale = 1f, flash, hover; }
 
@@ -59,7 +63,7 @@ namespace GorillaCaster
             Root = new GameObject("SpooderPhone") { hideFlags = HideFlags.DontSave };
 
             float w = CW * S, h = CH * S, t = 0.01f;
-            Box(Root.transform, Vector3.zero, new Vector3(w + 0.012f, h + 0.012f, t), new Color(0.06f, 0.065f, 0.08f));
+            Box(Root.transform, Vector3.zero, new Vector3(w + 0.012f, h + 0.012f, t), new Color(0.05f, 0.055f, 0.07f));
 
             var lensGo = new GameObject("Lens");
             lensGo.transform.SetParent(Root.transform, false);
@@ -87,47 +91,49 @@ namespace GorillaCaster
             _canvas = (RectTransform)go.transform;
             _canvas.sizeDelta = new Vector2(CW, CH);
             _canvas.localPosition = new Vector3(0, 0, 0.0085f);
-            _canvas.localScale = new Vector3(-S, S, S);
+            _canvas.localScale = new Vector3(-S, S, S);   // negative X un-mirrors (canvas +x => visual LEFT)
 
-            MkImage(_canvas, "bg", Round(), new Color(0.10f, 0.11f, 0.14f, 1f), 0, 0, CW, CH);
-            _accentBar = MkImage(_canvas, "accent", Round(), Styles.Accent, 0, CH / 2f - 8, CW - 30, 5);
-            MkText(_canvas, "brand", "SPOODER", 28, new Color(0.5f, 0.85f, 1f), -CW / 2f + 110, CH / 2f - 36, 200, 34, TextAnchor.MiddleLeft);
-            _status = MkText(_canvas, "status", "READY", 26, Color.white, CW / 2f - 150, CH / 2f - 36, 280, 34, TextAnchor.MiddleRight);
+            MkImage(_canvas, "bg", Round(), new Color(0.09f, 0.10f, 0.13f, 1f), 0, 0, CW, CH);
+            _accentBar = MkImage(_canvas, "accent", Round(), Pink, 0, CH / 2f - 8, CW - 30, 5);
+            _status = MkText(_canvas, "status", "READY", 26, Color.white, 0, CH / 2f - 34, CW, 32, TextAnchor.MiddleCenter);
 
-            // ---------- CAMERA PAGE ----------
-            _camPanel = Panel("camPanel");
-            MkImage(_camPanel.transform, "vfbg", Round(), Color.black, -CW * 0.235f, -10, CW * 0.45f + 10, CH * 0.74f + 10);
-            _vf = MkRaw(_camPanel.transform, "vf", -CW * 0.235f, -10, CW * 0.45f, CH * 0.74f);
+            // ---------- CAMERA PAGE ----------  screen at canvas -x (visual right); buttons at canvas +x (visual left)
+            _camPanel = MkPanel("camPanel");
+            MkImage(_camPanel.transform, "vfbg", Round(), Color.black, -CW * 0.22f, -8, CW * 0.5f + 12, CH * 0.78f + 12);
+            _vf = MkRaw(_camPanel.transform, "vf", -CW * 0.22f, -8, CW * 0.5f, CH * 0.78f);
 
-            float[] cx = { 118f, 286f };
-            float[] ry = { 150f, 92f, 34f, -26f };
-            AddBtn(_camPanel.transform, "1st P", cx[0], ry[0], "fp", new Color(0.2f, 0.42f, 0.5f), 0);
-            AddBtn(_camPanel.transform, "SELFIE", cx[1], ry[0], "selfie", new Color(0.2f, 0.42f, 0.5f), 0);
-            AddBtn(_camPanel.transform, "FOV -", cx[0], ry[1], "fov-", Pcol(), 0);
-            AddBtn(_camPanel.transform, "FOV +", cx[1], ry[1], "fov+", Pcol(), 0);
-            AddBtn(_camPanel.transform, "SMTH -", cx[0], ry[2], "smooth-", Pcol(), 0);
-            AddBtn(_camPanel.transform, "SMTH +", cx[1], ry[2], "smooth+", Pcol(), 0);
-            AddBtn(_camPanel.transform, "SHOT", cx[0], ry[3], "shot", Pcol(), 0);
-            AddBtn2(_camPanel.transform, "MODS", cx[1], ry[3], () => SetPage(1), new Color(0.34f, 0.27f, 0.55f), 0);
+            float[] cx = { 140f, 268f, 396f };
+            float[] ry = { 118f, 30f, -58f };
+            float bw = 118f, bh = 70f;
+            AddBtn(_camPanel.transform, "FPV", cx[0], ry[0], "fp", Pink, 0, bw, bh);
+            AddBtn(_camPanel.transform, "SELFIE", cx[1], ry[0], "selfie", Pink, 0, bw, bh);
+            AddBtn2(_camPanel.transform, "MODS", cx[2], ry[0], () => SetPage(1), new Color(0.55f, 0.3f, 0.7f), 0, bw, bh);
+            AddBtn(_camPanel.transform, "FOV -", cx[0], ry[1], "fov-", PinkDim, 0, bw, bh);
+            AddBtn(_camPanel.transform, "FOV +", cx[1], ry[1], "fov+", PinkDim, 0, bw, bh);
+            AddBtn(_camPanel.transform, "SHOT", cx[2], ry[1], "shot", PinkDim, 0, bw, bh);
+            AddBtn(_camPanel.transform, "SMTH -", cx[0], ry[2], "smooth-", PinkDim, 0, bw, bh);
+            AddBtn(_camPanel.transform, "SMTH +", cx[1], ry[2], "smooth+", PinkDim, 0, bw, bh);
+            AddBtn(_camPanel.transform, "HIDE", cx[2], ry[2], "hud", PinkDim, 0, bw, bh);
 
             // ---------- MOD-CHECK PAGE ----------
-            _modPanel = Panel("modPanel");
-            MkText(_modPanel.transform, "modtitle", "MOD CHECKER", 26, Styles.Accent, 0, CH / 2f - 64, CW, 30, TextAnchor.MiddleCenter);
-            AddBtn2(_modPanel.transform, "BACK", -CW / 2f + 90, CH / 2f - 64, () => SetPage(0), new Color(0.2f, 0.42f, 0.5f), 1, 150, 44);
-            AddBtn2(_modPanel.transform, "REFRESH", CW / 2f - 100, CH / 2f - 64, RefreshMods, Pcol(), 1, 160, 44);
-            float ry0 = CH / 2f - 110;
-            for (int i = 0; i < 11; i++)
+            _modPanel = MkPanel("modPanel");
+            MkImage(_modPanel.transform, "board", Round(), new Color(0.06f, 0.07f, 0.09f, 1f), 0, -14, CW - 40, CH - 96);
+            MkText(_modPanel.transform, "modtitle", "MOD CHECKER", 26, Pink, 0, CH / 2f - 60, CW, 30, TextAnchor.MiddleCenter);
+            AddBtn2(_modPanel.transform, "BACK", -CW / 2f + 96, CH / 2f - 58, () => SetPage(0), Pink, 1, 150, 46);
+            AddBtn2(_modPanel.transform, "REFRESH", CW / 2f - 104, CH / 2f - 58, RefreshMods, PinkDim, 1, 168, 46);
+            float ry0 = CH / 2f - 116;
+            for (int i = 0; i < 9; i++)
             {
-                var row = MkText(_modPanel.transform, "row" + i, "", 22, Color.white, -CW / 2f + 28, ry0 - i * 34f, CW - 56, 30, TextAnchor.MiddleLeft);
+                var row = MkText(_modPanel.transform, "row" + i, "", 24, Color.white, 0, ry0 - i * 38f, CW - 80, 34, TextAnchor.MiddleCenter);
                 _modRows.Add(row);
             }
 
-            _cursor = MkImage(_canvas, "cursor", Round(), new Color(Styles.Accent.r, Styles.Accent.g, Styles.Accent.b, 0.9f), 0, 0, 26, 26);
+            _cursor = MkImage(_canvas, "cursor", Round(), new Color(1f, 0.5f, 0.75f, 0.95f), 0, 0, 26, 26);
             _cursor.transform.SetAsLastSibling();
             _cursor.gameObject.SetActive(false);
         }
 
-        private GameObject Panel(string n)
+        private GameObject MkPanel(string n)
         {
             var go = new GameObject(n, typeof(RectTransform), typeof(CanvasGroup));
             go.transform.SetParent(_canvas, false);
@@ -140,7 +146,6 @@ namespace GorillaCaster
             _page = p;
             if (_camPanel != null) _camPanel.SetActive(p == 0);
             if (_modPanel != null) _modPanel.SetActive(p == 1);
-            if (_preview != null) _preview.enabled = (p == 0) && Viewfinder;
             if (p == 1) RefreshMods();
         }
 
@@ -159,13 +164,13 @@ namespace GorillaCaster
             }
         }
 
-        private void AddBtn(Transform parent, string label, float x, float y, string cmd, Color col, int page)
-            => AddBtn2(parent, label, x, y, () => OnCommand?.Invoke(cmd), col, page);
+        private void AddBtn(Transform parent, string label, float x, float y, string cmd, Color col, int page, float w, float h)
+            => AddBtn2(parent, label, x, y, () => OnCommand?.Invoke(cmd), col, page, w, h);
 
         private void AddBtn2(Transform parent, string label, float x, float y, Action act, Color col, int page, float w = 152f, float h = 52f)
         {
             var img = MkImage(parent, "b_" + label, Round(), col, x, y, w, h);
-            MkText(img.rectTransform, "t", label, 26, Color.white, 0, 0, w, h, TextAnchor.MiddleCenter);
+            MkText(img.rectTransform, "t", label, 25, Color.white, 0, 0, w, h, TextAnchor.MiddleCenter);
             _btns.Add(new Btn { rt = img.rectTransform, img = img, c = new Vector2(x, y), half = new Vector2(w / 2f, h / 2f), act = act, col = col, page = page });
         }
 
@@ -186,11 +191,10 @@ namespace GorillaCaster
         {
             try
             {
-                _rt = new RenderTexture(460, 300, 16) { name = "SpooderRT", hideFlags = HideFlags.DontSave };
+                _rt = new RenderTexture(540, 320, 16) { name = "SpooderRT", hideFlags = HideFlags.DontSave };
                 _rt.Create();
                 var camGo = new GameObject("PreviewCam");
-                camGo.transform.SetParent(Lens, false);
-                camGo.transform.localPosition = new Vector3(0, 0, 0.02f);
+                camGo.transform.SetParent(Root.transform, false);
                 _preview = camGo.AddComponent<Camera>();
                 _preview.targetTexture = _rt; _preview.fieldOfView = 90f; _preview.nearClipPlane = 0.02f; _preview.farClipPlane = 700f;
                 _preview.depth = -20; _preview.clearFlags = CameraClearFlags.Skybox; _preview.allowMSAA = false;
@@ -207,8 +211,8 @@ namespace GorillaCaster
             _laser.useWorldSpace = true; _laser.positionCount = 2; _laser.numCapVertices = 4;
             _laser.startWidth = 0.004f; _laser.endWidth = 0.004f;
             _laser.material = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color"));
-            _laser.startColor = new Color(Styles.Accent.r, Styles.Accent.g, Styles.Accent.b, 0.9f);
-            _laser.endColor = new Color(Styles.Accent.r, Styles.Accent.g, Styles.Accent.b, 0.2f);
+            _laser.startColor = new Color(1f, 0.5f, 0.75f, 0.9f);
+            _laser.endColor = new Color(1f, 0.5f, 0.75f, 0.2f);
             _laser.enabled = false;
         }
 
@@ -221,7 +225,7 @@ namespace GorillaCaster
             if (hh != null)
             {
                 Root.transform.position = hh.position + hh.forward * 0.5f - hh.up * 0.08f;
-                Root.transform.rotation = Quaternion.LookRotation(hh.position - Root.transform.position, Vector3.up); // face the user
+                Root.transform.rotation = Quaternion.LookRotation(hh.position - Root.transform.position, Vector3.up);
             }
             else if (Camera.main != null) Root.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 0.55f;
             _popT = 0f; Held = false; SetPage(0);
@@ -234,12 +238,18 @@ namespace GorillaCaster
             Root = null; Lens = null; Held = false; _preview = null; _btns.Clear(); _modRows.Clear(); _canvas = null;
         }
 
-        public void SetFov(float fov) { if (_preview != null) _preview.fieldOfView = Mathf.Clamp(fov, 10f, 120f); }
+        public void SetFov(float fov) { }
 
         public void Tick(float fov)
         {
             if (Root == null) return;
-            SetFov(fov);
+            // mirror the live broadcast camera onto the screen
+            if (_preview != null && CastingCam != null)
+            {
+                _preview.transform.SetPositionAndRotation(CastingCam.transform.position, CastingCam.transform.rotation);
+                _preview.fieldOfView = CastingCam.fieldOfView;
+                if (_preview.enabled != Viewfinder) _preview.enabled = Viewfinder;
+            }
 
             var poller = ControllerInputPoller.instance;
             var tagger = GorillaTagger.Instance;
@@ -308,11 +318,7 @@ namespace GorillaCaster
                 }
                 if (hovered >= 0) { _btns[hovered].hover = 1f; _hoverIdx = hovered; }
             }
-            if (trigger && !_trigPrev)
-            {
-                int target = _hoverPrev >= 0 ? _hoverPrev : hovered;
-                if (target >= 0) Click(target);
-            }
+            if (trigger && !_trigPrev) { int t = _hoverPrev >= 0 ? _hoverPrev : hovered; if (t >= 0) Click(t); }
             _hoverPrev = hovered;
             _trigPrev = trigger;
             return hit;
@@ -336,7 +342,7 @@ namespace GorillaCaster
                 _lastHoverSound = _hoverIdx;
             }
             if (_popT < 1f) { _popT = Mathf.Min(1f, _popT + Time.deltaTime * 5f); float s = Mathf.SmoothStep(0.7f, 1f, _popT); if (_rootGroup != null) _rootGroup.alpha = _popT; if (_canvas != null) _canvas.localScale = new Vector3(-S, S, S) * s; }
-            if (_accentBar != null) _accentBar.color = Color.Lerp(Styles.Accent, Styles.Accent2, 0.5f + 0.5f * Mathf.Sin(Time.time * 1.5f));
+            if (_accentBar != null) _accentBar.color = Color.Lerp(Pink, new Color(1f, 0.55f, 0.8f), 0.5f + 0.5f * Mathf.Sin(Time.time * 1.5f));
 
             for (int i = 0; i < _btns.Count; i++)
             {
@@ -345,7 +351,7 @@ namespace GorillaCaster
                 b.scale = Mathf.Lerp(b.scale, ts, Time.deltaTime * 12f);
                 b.rt.localScale = Vector3.one * b.scale;
                 Color c = b.col;
-                if (b.hover > 0.01f) c = Color.Lerp(b.col, Color.white, 0.14f);
+                if (b.hover > 0.01f) c = Color.Lerp(b.col, Color.white, 0.16f);
                 if (b.flash > 0f) { b.flash -= Time.deltaTime * 4f; c = Color.Lerp(c, Color.white, Mathf.Clamp01(b.flash)); }
                 b.img.color = c;
                 b.hover = Mathf.MoveTowards(b.hover, 0f, Time.deltaTime * 6f);
@@ -367,7 +373,6 @@ namespace GorillaCaster
 
         // ============================================================ uGUI helpers
 
-        private static Color Pcol() => new Color(0.18f, 0.20f, 0.25f);
         private static Sprite _round;
         private static Sprite Round() { if (_round == null) { var t = TextureGen.RoundedRect(40, 16, Color.white); _round = Sprite.Create(t, new Rect(0, 0, 40, 40), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(16, 16, 16, 16)); } return _round; }
         private static Font _font;
