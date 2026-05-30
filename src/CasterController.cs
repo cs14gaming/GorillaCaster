@@ -84,6 +84,8 @@ namespace GorillaCaster
         private bool _autoDirector;
 
         private bool _cheatsheet, _crosshair;
+        private bool _aPrev;
+        private Transform _camFollower;
 
         // toggles
         private bool _menuOpen;
@@ -187,6 +189,15 @@ namespace GorillaCaster
             if (Pressed(Key.LeftBracket)) CyclePreset(-1);
             if (Pressed(Key.RightBracket)) CyclePreset(1);
 
+            // A button (right primary) summons / dismisses the tablet
+            var cip = ControllerInputPoller.instance;
+            if (cip != null)
+            {
+                bool a = cip.rightControllerPrimaryButton;
+                if (a && !_aPrev) { if (_goPro.Spawned) _goPro.Despawn(); else _goPro.SummonToHand(); }
+                _aPrev = a;
+            }
+
             RefreshRigs();
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
@@ -237,8 +248,9 @@ namespace GorillaCaster
             switch (_mode)
             {
                 case CamMode.FirstPerson:
-                    desiredPos = head.TransformPoint(_fpOffset);
-                    desiredRot = head.rotation;
+                    Transform fpSrc = LocalFpSource() ?? head;   // Pokruk-style: smooth Camera Follower for local player
+                    desiredPos = fpSrc.TransformPoint(_fpOffset);
+                    desiredRot = fpSrc.rotation;
                     if (_fpHideCosmetics && !FirstPerson.Hidden) FirstPerson.Hide();
                     break;
                 case CamMode.Selfie:
@@ -267,7 +279,7 @@ namespace GorillaCaster
             }
 
             // camera collision: don't clip through walls between the target and the camera
-            if (_collision && _target != null)
+            if (_collision && _target != null && _mode != CamMode.FirstPerson)
             {
                 Vector3 pivot = head.position + Vector3.up * 0.05f;
                 Vector3 d = desiredPos - pivot; float dist = d.magnitude;
@@ -277,12 +289,30 @@ namespace GorillaCaster
             // dutch / roll tilt
             if (Mathf.Abs(_roll) > 0.01f) desiredRot = desiredRot * Quaternion.Euler(0, 0, _roll);
 
-            float pk = SmoothK(_moveSmoothing), rk = SmoothK(_rotSmoothing);
+            float pk, rk;
+            if (_mode == CamMode.FirstPerson) { pk = SmoothK(0.05f); rk = SmoothK(0.10f); }   // tight + responsive
+            else { pk = SmoothK(_moveSmoothing); rk = SmoothK(_rotSmoothing); }
             _cam.transform.position = Vector3.Lerp(_cam.transform.position, desiredPos, pk);
             _cam.transform.rotation = Quaternion.Slerp(_cam.transform.rotation, desiredRot, rk);
         }
 
         private static bool kbHeld(Key k) { var kb = Keyboard.current; return kb != null && kb[k].isPressed; }
+
+        // The game's pre-smoothed first-person camera anchor (avoids head-transform jitter when moving fast).
+        private Transform CamFollower()
+        {
+            if (_camFollower == null)
+            {
+                var go = GameObject.Find("Player Objects/Player VR Controller/GorillaPlayer/TurnParent/Main Camera/Camera Follower");
+                if (go != null) _camFollower = go.transform;
+            }
+            return _camFollower;
+        }
+        private Transform LocalFpSource()
+        {
+            var local = GorillaTagger.Instance != null ? GorillaTagger.Instance.offlineVRRig : null;
+            return _target == local ? CamFollower() : null;
+        }
 
         private static float SmoothK(float s)
         {

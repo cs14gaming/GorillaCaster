@@ -38,6 +38,7 @@ namespace GorillaCaster
         private Vector3 _localPos;
         private Quaternion _localRot;
         private Vector2 _smoothLp;
+        private Vector3 _aimOrigin, _aimDir;
         private bool _trigPrev;
         private int _hoverIdx = -1, _lastHoverSound = -1, _hoverPrev = -1;
         private const float GrabRadius = 0.42f;
@@ -233,9 +234,12 @@ namespace GorillaCaster
         private bool LaserRight(Transform rh, bool trigger)
         {
             Transform tip = Tip();
-            Vector3 origin = tip != null ? tip.position : rh.position;
-            Vector3 dir = tip != null ? (tip.position - rh.position).normalized : rh.forward;
-            if (dir.sqrMagnitude < 0.0001f) dir = rh.forward;
+            Vector3 liveOrigin = tip != null ? tip.position : rh.position;
+            Vector3 liveDir = tip != null ? (tip.position - rh.position).normalized : rh.forward;
+            if (liveDir.sqrMagnitude < 0.0001f) liveDir = rh.forward;
+            // freeze the aim while the trigger is held so the finger-curl can't bend the laser
+            if (!trigger || _aimDir.sqrMagnitude < 0.0001f) { _aimOrigin = liveOrigin; _aimDir = liveDir; }
+            Vector3 origin = _aimOrigin, dir = _aimDir;
 
             Vector3 nrm = _canvas.transform.forward, cpos = _canvas.position;
             float denom = Vector3.Dot(dir, nrm);
