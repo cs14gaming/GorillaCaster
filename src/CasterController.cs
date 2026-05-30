@@ -33,8 +33,11 @@ namespace GorillaCaster
         // tunables
         private float _fov = 90f;
         private float _nearClip = 0.05f;
-        private float _fpNearClip = 0.30f;     // first-person clip to hide own cosmetics
-        private bool _fpHideSelf = true;
+        private float _fpNearClip = 0.30f;     // first-person clip (secondary)
+        private bool _fpHideSelf = false;
+        private bool _fpHideCosmetics = true;  // Pokruk-style: disable worn face/hat cosmetics
+        private Vector3 _fpOffset = new Vector3(0f, 0f, 0.06f);
+        private bool _nametagOcclude = true;
         private float _followDistance = 1.4f;
         private float _followHeight = 0.25f;
         private float _followLead = 0f;
@@ -194,6 +197,7 @@ namespace GorillaCaster
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             HudExtras.NametagScale = _nametagScale;
+            HudExtras.Occlude = _nametagOcclude;
             if (Pressed(Key.F1)) _cheatsheet = !_cheatsheet;
             UpdateKillcam();
 
@@ -239,8 +243,9 @@ namespace GorillaCaster
             switch (_mode)
             {
                 case CamMode.FirstPerson:
-                    desiredPos = head.position + head.forward * 0.06f;
+                    desiredPos = head.TransformPoint(_fpOffset);
                     desiredRot = head.rotation;
+                    if (_fpHideCosmetics && !FirstPerson.Hidden) FirstPerson.Hide();
                     break;
                 case CamMode.Selfie:
                     desiredPos = head.position + head.forward * _selfieDist + Vector3.up * 0.03f;
@@ -419,9 +424,12 @@ namespace GorillaCaster
 
         private void SetMode(CamMode m)
         {
+            bool wasFp = _mode == CamMode.FirstPerson;
             _mode = m; _freeInit = false;
             if (m == CamMode.Tripod) _tripodSet = false;
             if (m == CamMode.GoPro && !_goPro.Spawned) _goPro.SummonToHand();
+            if (wasFp && m != CamMode.FirstPerson) FirstPerson.Restore();
+            if (m == CamMode.FirstPerson && _fpHideCosmetics) FirstPerson.Hide();
         }
 
         private void CycleMode() => SetMode((CamMode)(((int)_mode + 1) % ModeNames.Length));
@@ -442,6 +450,7 @@ namespace GorillaCaster
             _goPro.OnTime = CycleTimeOfDay;
             _goPro.OnHide = () => _hudHidden = !_hudHidden;
             _goPro.OnDirector = () => _autoDirector = !_autoDirector;
+            _goPro.OnShot = Screenshot;
             _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°" + (_replay.Recording ? "   REC" : "");
             _goPro.IsRecording = () => _replay.Recording;
         }
@@ -689,10 +698,16 @@ namespace GorillaCaster
             }
             else if (_mode == CamMode.FirstPerson)
             {
-                UI.Header("First Person");
-                _fpHideSelf = UI.Toggle("Hide my cosmetics (clip near)", _fpHideSelf);
-                if (_fpHideSelf) _fpNearClip = UI.Slider("Hide strength", _fpNearClip, 0.1f, 0.6f);
-                UI.Note("Bumps the casting camera's near-clip so your own head cosmetics vanish from the broadcast — your VR view is untouched.");
+                UI.Header("First Person  ·  Pokruk-style");
+                bool hc = UI.Toggle("Hide my hat / face cosmetics", _fpHideCosmetics);
+                if (hc != _fpHideCosmetics) { _fpHideCosmetics = hc; if (hc) FirstPerson.Hide(); else FirstPerson.Restore(); }
+                UI.Note("Disables your worn hat & face cosmetics locally so they don't block the first-person shot (restored when you leave FP).");
+                GUILayout.Space(4);
+                _fpOffset.x = UI.Slider("Offset X", _fpOffset.x, -0.3f, 0.3f);
+                _fpOffset.y = UI.Slider("Offset Y", _fpOffset.y, -0.3f, 0.3f);
+                _fpOffset.z = UI.Slider("Offset Z (forward)", _fpOffset.z, -0.2f, 0.4f);
+                _fpHideSelf = UI.Toggle("Also clip near plane", _fpHideSelf);
+                if (_fpHideSelf) _fpNearClip = UI.Slider("Clip strength", _fpNearClip, 0.1f, 0.6f);
             }
             else if (_mode == CamMode.Selfie)
             {
@@ -913,6 +928,7 @@ namespace GorillaCaster
             _lowerThird = UI.Toggle("Now-casting lower third", _lowerThird);
             _playerList = UI.Toggle("Player list", _playerList);
             _nametags = UI.Toggle("Floating nametags", _nametags);
+            _nametagOcclude = UI.Toggle("Hide nametags behind walls", _nametagOcclude);
             _nametagVelocity = UI.Toggle("Speed on nametags", _nametagVelocity);
             _minimap = UI.Toggle("Overhead minimap", _minimap);
             _hud = UI.Toggle("FPS / mode / speed readout", _hud);

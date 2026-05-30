@@ -48,15 +48,27 @@ namespace GorillaCaster
     {
         public static float NametagScale = 1f;
 
+        public static bool Occlude = true;
+
         public static void DrawNametags(IList<VRRig> rigs, Camera cam, VRRig target, bool showVelocity)
         {
             if (cam == null) return;
+            Vector3 camPos = cam.transform.position;
             for (int i = 0; i < rigs.Count; i++)
             {
                 var r = rigs[i];
                 if (r == null) continue;
 
-                Vector3 world = CasterUtil.HeadPos(r) + Vector3.up * 0.45f;
+                Vector3 headW = CasterUtil.HeadPos(r);
+                // occlusion: skip if a wall is between the camera and the player's head
+                if (Occlude && r != target)
+                {
+                    float dist = Vector3.Distance(camPos, headW);
+                    if (Physics.Linecast(camPos, headW, out RaycastHit hit, ~0, QueryTriggerInteraction.Ignore)
+                        && hit.distance < dist - 0.5f) continue;
+                }
+
+                Vector3 world = headW + Vector3.up * 0.45f;
                 Vector3 sp = cam.WorldToScreenPoint(world);
                 if (sp.z <= 0.2f) continue;
 
