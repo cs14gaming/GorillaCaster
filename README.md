@@ -24,8 +24,11 @@ touched. Point OBS at the game window and cast.
     **stabilization** and **auto-level** options.
   - **Tripod** – plant a static camera anywhere; it stays put and auto-tracks the cast player.
   - **Selfie** – sits in front of the player's face looking back.
-- **Clean First-Person** – first-person mode bumps the *casting* camera's near-clip so your own
-  head cosmetics disappear from the broadcast, while your VR view stays untouched.
+- **Clean First-Person (Pokruk-style)** – first-person hides your worn **hat + face cosmetics**
+  locally (restored when you leave FP) so they don't block the shot, with X/Y/Z eye offset.
+- **Camera collision** keeps the follow camera from clipping through walls; **dutch/roll** tilt
+  and **orbit pitch** for cinematic angles; **Frame-all** fits every player in one shot.
+- **Nametag occlusion** – nametags hide when a wall is between the camera and the player.
 - **Instant Replay** – continuously buffers every player's motion, then replays it so you can
   rewind, **slow-mo** (0.1–2×), and scrub a moment — while flying the camera freely. `F6`
   record, `F7` play/stop, drag the on-screen bar to scrub.
@@ -115,7 +118,8 @@ runtime errors.
 |------|---------|
 | `src/Plugin.cs` | BepInEx entry point + config |
 | `src/CasterController.cs` | Main loop: camera, input, menu, overlays |
-| `src/GoProProp.cs` | Grabbable in-VR phone: model, viewfinder, poke buttons, grab |
+| `src/GoProProp.cs` | Grabbable in-VR uGUI tablet: viewfinder, touch buttons, grab |
+| `src/FirstPerson.cs` | Pokruk-style FP head-cosmetic hiding |
 | `src/DollyPath.cs` | Keyframed Catmull-Rom director path |
 | `src/ReplayRecorder.cs` | Instant-replay buffer + playback |
 | `src/HudExtras.cs` | Nametags, minimap, watermark, velocity, helpers |
