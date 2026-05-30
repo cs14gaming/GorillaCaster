@@ -6,10 +6,10 @@ using UnityEngine.UI;
 namespace GorillaCaster
 {
     /// <summary>
-    /// A clean, grabbable in-VR camera TABLET built with world-space uGUI (crisp text + rounded
-    /// buttons) — a big live viewfinder on the left, a labelled control grid on the right.
-    /// Operate it with your free hand (poke a button, or hover + squeeze trigger). Grab with grip,
-    /// drop to place (sticky). Tablet camera mode broadcasts from its rear lens.
+    /// A premium, grabbable in-VR control TABLET built with world-space uGUI. Multi-page touch UI
+    /// (Camera / Cast / World / Look / Comp), a live viewfinder, dynamic button animations and
+    /// click sounds. You poke it with your fingertip (the game's hand trigger collider). The screen
+    /// always billboards to your head so it's never mirrored. Grab with grip, drop to place.
     /// </summary>
     internal class GoProProp
     {
@@ -19,44 +19,51 @@ namespace GorillaCaster
         public bool Spawned => Root != null;
         public bool Viewfinder = true;
 
-        public Action OnNext, OnPrev, OnCycleMode, OnToggleView, OnFovUp, OnFovDown, OnTime, OnHide, OnDirector, OnShot;
+        public Action<string> OnCommand;   // single command bus ("mode","fov+","day",...)
         public Func<string> StatusText;
 
         private Camera _preview;
         private RenderTexture _rt;
         private RawImage _vf;
         private Text _status;
+        private Image _accentBar;
         private RectTransform _canvas;
-        private readonly List<TBtn> _btns = new List<TBtn>();
+        private CanvasGroup _rootGroup;
+        private AudioSource _audio;
+        private AudioClip _click, _hover;
+        private int _layer;
+        private float _popT;            // spawn pop-in
+        private int _page;
+        private readonly List<Page> _pages = new List<Page>();
+        private readonly List<Btn> _btns = new List<Btn>();   // all buttons (tabs + page buttons)
         private int _hand;
         private Vector3 _localPos;
         private Quaternion _localRot;
-        private const float GrabRadius = 0.28f;
+        private int _pressR = -1, _pressL = -1;   // edge-detect: button currently pressed per hand
+        private const float GrabRadius = 0.30f;
+        private const float CW = 660f, CH = 410f, S = 0.00040f;
 
-        // canvas dimensions (px) and metres-per-px scale
-        private const float CW = 600f, CH = 380f, S = 0.00041f;
-
-        private class TBtn
+        private class Page { public string id; public GameObject go; public CanvasGroup cg; public float alpha; }
+        private class Btn
         {
-            public Vector2 c, half;
-            public Action act;
-            public Color col;
-            public Image img;
-            public float flash;
+            public RectTransform rt; public Image img; public Text txt;
+            public Vector2 c, half; public Action act; public Color col;
+            public int page;       // -1 = always visible
+            public float scale = 1f, flash, hover;
+            public Func<bool> active; // optional on/off state for toggle buttons
         }
 
-        // ============================================================ model + canvas
+        // ============================================================ spawn
 
         public void EnsureSpawned()
         {
             if (Root != null) return;
+            _layer = FreeLayer();
             Root = new GameObject("SpooderTablet") { hideFlags = HideFlags.DontSave };
 
             float w = CW * S, h = CH * S, t = 0.008f;
-            // body slab (screen on +z toward holder, lens on -z)
-            Box(Root.transform, Vector3.zero, new Vector3(w + 0.008f, h + 0.008f, t), new Color(0.07f, 0.075f, 0.09f));
-
-            // rear lens (-z) + glow — films away from the holder
+            Box(Root.transform, Vector3.zero, new Vector3(w + 0.01f, h + 0.01f, t), new Color(0.06f, 0.065f, 0.08f));
+            // rear lens (-z)
             Box(Root.transform, new Vector3(w * 0.4f, h * 0.4f, -0.006f), new Vector3(0.022f, 0.022f, 0.01f), new Color(0.03f, 0.03f, 0.04f));
             var glass = Cyl(Root.transform, new Vector3(w * 0.4f, h * 0.4f, -0.012f), 0.008f, 0.002f, new Color(0.1f, 0.4f, 0.6f), true);
             glass.transform.localRotation = Quaternion.Euler(90, 0, 0);
@@ -64,78 +71,154 @@ namespace GorillaCaster
             var lensGo = new GameObject("Lens");
             lensGo.transform.SetParent(Root.transform, false);
             lensGo.transform.localPosition = new Vector3(w * 0.4f, h * 0.4f, -0.03f);
-            lensGo.transform.localRotation = Quaternion.Euler(0, 180, 0); // forward = -z
+            lensGo.transform.localRotation = Quaternion.Euler(0, 180, 0);   // films away from holder
             Lens = lensGo.transform;
 
+            BuildAudio();
             BuildCanvas();
             BuildViewfinder();
+
+            SetLayer(Root, _layer);
+            if (_preview != null) _preview.cullingMask = ~(1 << _layer);   // never film the tablet (no feedback freeze)
+            _popT = 0f;
+            SetPage(0, instant: true);
             Held = false;
         }
 
         private void BuildCanvas()
         {
-            var go = new GameObject("Canvas", typeof(Canvas));
+            var go = new GameObject("Canvas", typeof(Canvas), typeof(CanvasGroup));
             go.transform.SetParent(Root.transform, false);
-            var canvas = go.GetComponent<Canvas>();
-            canvas.renderMode = RenderMode.WorldSpace;
+            go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            _rootGroup = go.GetComponent<CanvasGroup>();
             _canvas = (RectTransform)go.transform;
             _canvas.sizeDelta = new Vector2(CW, CH);
-            _canvas.localPosition = new Vector3(0, 0, 0.0075f); // screen on +z (faces holder, NOT mirrored)
+            _canvas.localPosition = new Vector3(0, 0, 0.0075f);
             _canvas.localScale = Vector3.one * S;
 
-            // background
-            var bg = MkImage(_canvas, "bg", Round(), new Color(0.10f, 0.11f, 0.14f, 1f));
-            SetRect(bg.rectTransform, 0, 0, CW, CH);
-            var accent = MkImage(_canvas, "accent", Round(), Styles.Accent);
-            SetRect(accent.rectTransform, 0, CH / 2f - 5, CW - 24, 4);
-
-            // status
-            _status = MkText(_canvas, "status", "READY", 24, new Color(0.8f, 0.9f, 1f));
-            SetRect(_status.rectTransform, 0, CH / 2f - 28, CW - 30, 30);
+            MkImage(_canvas, "bg", Round(), new Color(0.10f, 0.11f, 0.14f, 1f), 0, 0, CW, CH);
+            _accentBar = MkImage(_canvas, "accent", Round(), Styles.Accent, 0, CH / 2f - 6, CW - 26, 4);
+            MkText(_canvas, "brand", "SPOODER", 22, new Color(0.5f, 0.85f, 1f), -CW / 2f + 90, CH / 2f - 30, 170, 28, TextAnchor.MiddleLeft);
+            _status = MkText(_canvas, "status", "READY", 22, Color.white, CW / 2f - 130, CH / 2f - 30, 240, 28, TextAnchor.MiddleRight);
 
             // viewfinder (left)
-            var vfBg = MkImage(_canvas, "vfbg", Round(), Color.black);
-            SetRect(vfBg.rectTransform, -CW * 0.205f, -8, CW * 0.52f, CH * 0.78f);
-            _vf = MkRaw(_canvas, "vf");
-            SetRect(_vf.rectTransform, -CW * 0.205f, -8, CW * 0.52f - 10, CH * 0.78f - 10);
+            MkImage(_canvas, "vfbg", Round(), Color.black, -CW * 0.225f, -14, CW * 0.46f + 8, CH * 0.7f + 8);
+            _vf = MkRaw(_canvas, "vf", -CW * 0.225f, -14, CW * 0.46f, CH * 0.7f);
 
-            // control grid (right): 2 cols x 5 rows
-            float colL = CW * 0.16f, colR = CW * 0.36f, bw = CW * 0.18f, bh = CH * 0.13f;
-            float[] rows = { CH * 0.30f, CH * 0.15f, 0f, -CH * 0.15f, -CH * 0.30f };
-            AddBtn(colL, rows[0], bw, bh, "NEXT", new Color(0.20f, 0.45f, 0.5f), () => OnNext?.Invoke());
-            AddBtn(colR, rows[0], bw, bh, "MODE", Panel(), () => OnCycleMode?.Invoke());
-            AddBtn(colL, rows[1], bw, bh, "PREV", new Color(0.20f, 0.45f, 0.5f), () => OnPrev?.Invoke());
-            AddBtn(colR, rows[1], bw, bh, "DIR", new Color(0.32f, 0.27f, 0.55f), () => OnDirector?.Invoke());
-            AddBtn(colL, rows[2], bw, bh, "FOV-", Panel(), () => OnFovDown?.Invoke());
-            AddBtn(colR, rows[2], bw, bh, "FOV+", Panel(), () => OnFovUp?.Invoke());
-            AddBtn(colL, rows[3], bw, bh, "VIEW", Panel(), () => OnToggleView?.Invoke());
-            AddBtn(colR, rows[3], bw, bh, "TIME", Panel(), () => OnTime?.Invoke());
-            AddBtn(colL, rows[4], bw, bh, "HUD", Panel(), () => OnHide?.Invoke());
-            AddBtn(colR, rows[4], bw, bh, "SHOT", Panel(), () => OnShot?.Invoke());
+            // tab row (top of right panel)
+            string[] tabs = { "CAM", "CAST", "WORLD", "LOOK", "COMP" };
+            float tx0 = 60f, tstep = 52f, ty = CH * 0.34f;
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                int idx = i;
+                AddBtn(tabs[i], tx0 + i * tstep, ty, 48, 30, new Color(0.15f, 0.17f, 0.22f), () => SetPage(idx), -1, 20,
+                       () => _page == idx);
+            }
+
+            // pages
+            AddPage("CAM");
+            float[] cols = { 90f, 222f };
+            float[] rowsA = { 78f, 22f, -34f };
+            PageBtn("CAM", "MODE", cols[0], rowsA[0], "mode", Panel());
+            PageBtn("CAM", "VIEW", cols[1], rowsA[0], "view", Panel());
+            PageBtn("CAM", "FOV -", cols[0], rowsA[1], "fov-", Panel());
+            PageBtn("CAM", "FOV +", cols[1], rowsA[1], "fov+", Panel());
+            PageBtn("CAM", "ORBIT", cols[0], rowsA[2], "orbit", Panel());
+            PageBtn("CAM", "1st P", cols[1], rowsA[2], "fp", Panel());
+
+            AddPage("CAST");
+            PageBtn("CAST", "NEXT", cols[0], rowsA[0], "next", new Color(0.18f, 0.42f, 0.5f));
+            PageBtn("CAST", "PREV", cols[1], rowsA[0], "prev", new Color(0.18f, 0.42f, 0.5f));
+            PageBtn("CAST", "AUTO", cols[0], rowsA[1], "auto", Panel());
+            PageBtn("CAST", "DIRECT", cols[1], rowsA[1], "dir", new Color(0.32f, 0.27f, 0.55f));
+
+            AddPage("WORLD");
+            PageBtn("WORLD", "DAY", cols[0], rowsA[0], "day", Panel());
+            PageBtn("WORLD", "NIGHT", cols[1], rowsA[0], "night", Panel());
+            PageBtn("WORLD", "RAIN", cols[0], rowsA[1], "rain", Panel());
+            PageBtn("WORLD", "CLEAR", cols[1], rowsA[1], "clear", Panel());
+
+            AddPage("LOOK");
+            PageBtn("LOOK", "FILTER", cols[0], rowsA[0], "filter", Panel());
+            PageBtn("LOOK", "VIGN", cols[1], rowsA[0], "vignette", Panel());
+            PageBtn("LOOK", "ASPECT", cols[0], rowsA[1], "aspect", Panel());
+            PageBtn("LOOK", "GRID", cols[1], rowsA[1], "grid", Panel());
+
+            AddPage("COMP");
+            PageBtn("COMP", "TIMER", cols[0], rowsA[0], "timer", Panel());
+            PageBtn("COMP", "SCORE", cols[1], rowsA[0], "score", Panel());
+            PageBtn("COMP", "START", cols[0], rowsA[1], "tstart", new Color(0.2f, 0.45f, 0.32f));
+            PageBtn("COMP", "RESET", cols[1], rowsA[1], "treset", new Color(0.5f, 0.3f, 0.22f));
+
+            // always-visible SHOT + HUD
+            AddBtn("SHOT", 90, -96, 120, 40, new Color(0.2f, 0.42f, 0.5f), () => OnCommand?.Invoke("shot"), -1, 14, null);
+            AddBtn("HUD", 222, -96, 120, 40, Panel(), () => OnCommand?.Invoke("hud"), -1, 14, null);
         }
 
-        private void AddBtn(float x, float y, float w, float h, string label, Color col, Action act)
+        private void AddPage(string id)
         {
-            var img = MkImage(_canvas, "btn_" + label, Round(), col);
-            SetRect(img.rectTransform, x, y, w, h);
-            var txt = MkText(img.rectTransform, "t", label, 26, Color.white);
-            SetRect(txt.rectTransform, 0, 0, w, h);
-            _btns.Add(new TBtn { c = new Vector2(x, y), half = new Vector2(w / 2f, h / 2f), act = act, col = col, img = img });
+            var go = new GameObject("page_" + id, typeof(CanvasGroup));
+            var rt = go.AddComponent<RectTransform>();
+            go.transform.SetParent(_canvas, false);
+            SetRect(rt, 0, 0, CW, CH);
+            _pages.Add(new Page { id = id, go = go, cg = go.GetComponent<CanvasGroup>(), alpha = id == "CAM" ? 1f : 0f });
+        }
+
+        private void PageBtn(string page, string label, float x, float y, string cmd, Color col)
+        {
+            int pi = _pages.FindIndex(p => p.id == page);
+            var parent = _pages[pi].go.transform;
+            MakeBtn(parent, label, x, y, 122, 46, col, () => OnCommand?.Invoke(cmd), pi, 24, null);
+        }
+
+        private void AddBtn(string label, float x, float y, float w, float h, Color col, Action act, int page, int font, Func<bool> active)
+        {
+            MakeBtn(_canvas, label, x, y, w, h, col, act, page, font, active);
+        }
+
+        private Btn MakeBtn(Transform parent, string label, float x, float y, float w, float h, Color col, Action act, int page, int font, Func<bool> active)
+        {
+            var img = MkImage(parent, "b_" + label, Round(), col, x, y, w, h);
+            var txt = MkText(img.rectTransform, "t", label, font, Color.white, 0, 0, w, h, TextAnchor.MiddleCenter);
+            var b = new Btn { rt = img.rectTransform, img = img, txt = txt, c = new Vector2(x, y), half = new Vector2(w / 2f, h / 2f), act = act, col = col, page = page, active = active };
+            _btns.Add(b);
+            return b;
+        }
+
+        private void BuildAudio()
+        {
+            _audio = Root.AddComponent<AudioSource>();
+            _audio.playOnAwake = false; _audio.spatialBlend = 1f; _audio.volume = 0.6f; _audio.maxDistance = 8f;
+            _click = Blip(950f, 0.05f, 45f);
+            _hover = Blip(1500f, 0.025f, 80f);
+        }
+
+        private static AudioClip Blip(float freq, float dur, float decay)
+        {
+            int sr = 44100; int len = Mathf.Max(8, (int)(sr * dur));
+            var data = new float[len];
+            for (int i = 0; i < len; i++)
+            {
+                float ti = i / (float)sr;
+                data[i] = Mathf.Sin(2f * Mathf.PI * freq * ti) * Mathf.Exp(-ti * decay) * 0.5f;
+            }
+            var c = AudioClip.Create("blip", len, 1, sr, false);
+            c.SetData(data, 0);
+            return c;
         }
 
         private void BuildViewfinder()
         {
             try
             {
-                _rt = new RenderTexture(512, 320, 16) { name = "SpooderTabletRT", hideFlags = HideFlags.DontSave };
+                _rt = new RenderTexture(420, 260, 16) { name = "SpooderRT", hideFlags = HideFlags.DontSave };
                 _rt.Create();
                 var camGo = new GameObject("PreviewCam");
                 camGo.transform.SetParent(Lens, false);
                 camGo.transform.localPosition = new Vector3(0, 0, 0.006f);
                 _preview = camGo.AddComponent<Camera>();
-                _preview.targetTexture = _rt;
-                _preview.fieldOfView = 90f; _preview.nearClipPlane = 0.02f; _preview.farClipPlane = 700f;
-                _preview.depth = -10; _preview.clearFlags = CameraClearFlags.Skybox;
+                _preview.targetTexture = _rt; _preview.fieldOfView = 90f; _preview.nearClipPlane = 0.02f; _preview.farClipPlane = 700f;
+                _preview.depth = -20; _preview.clearFlags = CameraClearFlags.Skybox; _preview.allowMSAA = false;
                 if (_vf != null) _vf.texture = _rt;
             }
             catch (Exception e) { Debug.LogWarning("[GorillaCaster] viewfinder: " + e.Message); }
@@ -148,16 +231,16 @@ namespace GorillaCaster
             EnsureSpawned();
             var tagger = GorillaTagger.Instance;
             Transform t = tagger != null ? tagger.leftHandTransform : null;
-            if (t != null) { Root.transform.position = t.position + t.up * 0.06f; Root.transform.rotation = t.rotation; }
-            else if (Camera.main != null) { Root.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 0.6f; Root.transform.rotation = Camera.main.transform.rotation; }
-            Held = false;
+            if (t != null) { Root.transform.position = t.position + t.up * 0.06f; }
+            else if (Camera.main != null) Root.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 0.6f;
+            _popT = 0f; Held = false;
         }
 
         public void Despawn()
         {
             if (_rt != null) { _rt.Release(); UnityEngine.Object.Destroy(_rt); _rt = null; }
             if (Root != null) UnityEngine.Object.Destroy(Root);
-            Root = null; Lens = null; Held = false; _preview = null; _btns.Clear(); _canvas = null;
+            Root = null; Lens = null; Held = false; _preview = null; _btns.Clear(); _pages.Clear(); _canvas = null;
         }
 
         public void SetFov(float fov) { if (_preview != null) _preview.fieldOfView = Mathf.Clamp(fov, 10f, 120f); }
@@ -184,56 +267,132 @@ namespace GorillaCaster
                     Transform hand = _hand == 0 ? rh : lh;
                     bool grabbing = _hand == 0 ? poller.rightGrab : poller.leftGrab;
                     if (!grabbing || hand == null) Held = false;
-                    else Root.transform.SetPositionAndRotation(hand.TransformPoint(_localPos), hand.rotation * _localRot);
+                    else Root.transform.position = hand.TransformPoint(_localPos);
                     holding = _hand;
                 }
-                if (rh != null && holding != 0) Touch(rh.position, false, poller.rightControllerTriggerButton);
-                if (lh != null && holding != 1) Touch(lh.position, true, poller.leftControllerTriggerButton);
+
+                // fingertip touch (skip the holding hand)
+                if (holding != 0) Touch(0, Tip(true));
+                if (holding != 1) Touch(1, Tip(false));
             }
 
+            // always billboard the screen to the head so it's readable & never mirrored
+            Vector3 head = HeadPos();
+            if (head != Vector3.zero)
+                Root.transform.rotation = Quaternion.Slerp(Root.transform.rotation,
+                    Quaternion.LookRotation(Root.transform.position - head, Vector3.up), 0.35f);
+
+            Animate();
+        }
+
+        private void Touch(int handIdx, Transform tip)
+        {
+            int hovered = -1, pressed = -1;
+            if (tip != null && _canvas != null)
+            {
+                Vector3 lp = _canvas.InverseTransformPoint(tip.position);
+                if (lp.z > -40f && lp.z < 160f)
+                {
+                    for (int i = 0; i < _btns.Count; i++)
+                    {
+                        var b = _btns[i];
+                        if (!Visible(b)) continue;
+                        Vector2 p = ToCanvas(b, lp);
+                        if (Mathf.Abs(p.x - b.c.x) <= b.half.x && Mathf.Abs(p.y - b.c.y) <= b.half.y)
+                        {
+                            hovered = i;
+                            if (lp.z <= 28f) pressed = i;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (hovered >= 0) _btns[hovered].hover = 1f;
+
+            int last = handIdx == 0 ? _pressR : _pressL;
+            if (pressed >= 0 && pressed != last)   // press down-edge
+            {
+                var b = _btns[pressed];
+                b.flash = 1f; b.scale = 0.86f;
+                if (_audio != null && _click != null) _audio.PlayOneShot(_click, 0.7f);
+                try { b.act?.Invoke(); } catch (Exception e) { Debug.LogWarning("[GorillaCaster] btn: " + e.Message); }
+                try { if (GorillaTagger.Instance != null) GorillaTagger.Instance.StartVibration(handIdx == 1, 0.6f, 0.06f); } catch { }
+            }
+            else if (hovered >= 0 && hovered != last && pressed < 0)
+            {
+                if (_audio != null && _hover != null) _audio.PlayOneShot(_hover, 0.25f);
+            }
+            if (handIdx == 0) _pressR = pressed; else _pressL = pressed;
+        }
+
+        // a button may live inside a page panel (which is itself centered on the canvas), so its
+        // local coords are already canvas-space here since panels fill the canvas at (0,0).
+        private Vector2 ToCanvas(Btn b, Vector3 lp) => new Vector2(lp.x, lp.y);
+
+        private bool Visible(Btn b) => b.page < 0 || b.page == _page;
+
+        private void Animate()
+        {
+            // pop-in
+            if (_popT < 1f) { _popT = Mathf.Min(1f, _popT + Time.deltaTime * 5f); float s = Mathf.SmoothStep(0.7f, 1f, _popT); if (_rootGroup != null) _rootGroup.alpha = _popT; if (_canvas != null) _canvas.localScale = Vector3.one * S * s; }
+
+            // page fades
+            for (int i = 0; i < _pages.Count; i++)
+            {
+                var pg = _pages[i];
+                float target = i == _page ? 1f : 0f;
+                pg.alpha = Mathf.MoveTowards(pg.alpha, target, Time.deltaTime * 6f);
+                if (pg.cg != null) pg.cg.alpha = pg.alpha;
+                bool act = pg.alpha > 0.01f;
+                if (pg.go.activeSelf != act) pg.go.SetActive(act);
+            }
+
+            // accent pulse
+            if (_accentBar != null) _accentBar.color = Color.Lerp(Styles.Accent, Styles.Accent2, 0.5f + 0.5f * Mathf.Sin(Time.time * 1.5f));
+
+            // buttons: hover/press scale + flash + toggle state tint
             for (int i = 0; i < _btns.Count; i++)
             {
                 var b = _btns[i];
                 if (b.img == null) continue;
-                Color target = b.col;
-                if (b.flash > 0f) { b.flash -= Time.deltaTime * 4f; target = Color.Lerp(target, Styles.Accent, Mathf.Clamp01(b.flash)); }
-                b.img.color = target;
+                float targetScale = b.hover > 0.5f ? 1.08f : 1f;
+                b.scale = Mathf.Lerp(b.scale, targetScale, Time.deltaTime * 12f);
+                b.rt.localScale = Vector3.one * b.scale;
+
+                Color baseCol = (b.active != null && b.active()) ? Styles.Accent : b.col;
+                if (b.hover > 0.01f && (b.active == null || !b.active())) baseCol = Color.Lerp(b.col, Color.white, 0.12f);
+                if (b.flash > 0f) { b.flash -= Time.deltaTime * 4f; baseCol = Color.Lerp(baseCol, Color.white, Mathf.Clamp01(b.flash)); }
+                b.img.color = baseCol;
+                b.hover = Mathf.MoveTowards(b.hover, 0f, Time.deltaTime * 6f);
             }
+
             if (_status != null && StatusText != null) _status.text = StatusText();
         }
 
-        private void Touch(Vector3 worldHand, bool isLeft, bool trigger)
+        private void SetPage(int i, bool instant = false)
         {
-            if (_canvas == null) return;
-            Vector3 lp = _canvas.InverseTransformPoint(worldHand);   // canvas-local px; z = depth from screen
-            if (lp.z < -70f || lp.z > 70f) return;                   // not near the screen
-            for (int i = 0; i < _btns.Count; i++)
-            {
-                var b = _btns[i];
-                if (Mathf.Abs(lp.x - b.c.x) <= b.half.x && Mathf.Abs(lp.y - b.c.y) <= b.half.y)
-                {
-                    bool poke = lp.z >= -10f && lp.z <= 45f;
-                    bool click = trigger && lp.z <= 60f;
-                    if (b.flash <= 0f && (poke || click))
-                    {
-                        b.flash = 1f;
-                        try { b.act?.Invoke(); } catch (Exception e) { Debug.LogWarning("[GorillaCaster] btn: " + e.Message); }
-                        try { if (GorillaTagger.Instance != null) GorillaTagger.Instance.StartVibration(isLeft, 0.55f, 0.06f); } catch { }
-                    }
-                    return;
-                }
-            }
+            _page = Mathf.Clamp(i, 0, Mathf.Max(0, _pages.Count - 1));
+            if (instant) for (int p = 0; p < _pages.Count; p++) { _pages[p].alpha = p == _page ? 1f : 0f; if (_pages[p].cg != null) _pages[p].cg.alpha = _pages[p].alpha; _pages[p].go.SetActive(p == _page); }
         }
 
         private bool Near(Transform hand) => Vector3.Distance(hand.position, Root.transform.position) < GrabRadius;
-        private void Attach(int hand, Transform t)
+        private void Attach(int hand, Transform t) { Held = true; _hand = hand; _localPos = t.InverseTransformPoint(Root.transform.position); _localRot = Quaternion.Inverse(t.rotation) * Root.transform.rotation; }
+
+        private static Vector3 HeadPos()
         {
-            Held = true; _hand = hand;
-            _localPos = t.InverseTransformPoint(Root.transform.position);
-            _localRot = Quaternion.Inverse(t.rotation) * Root.transform.rotation;
+            var t = GorillaTagger.Instance;
+            if (t != null && t.mainCamera != null) return t.mainCamera.transform.position;
+            return Camera.main != null ? Camera.main.transform.position : Vector3.zero;
+        }
+        private static Transform Tip(bool right)
+        {
+            var t = GorillaTagger.Instance; if (t == null) return null;
+            var go = right ? t.rightHandTriggerCollider : t.leftHandTriggerCollider;
+            if (go != null) return go.transform;
+            return right ? t.rightHandTransform : t.leftHandTransform;
         }
 
-        // ============================================================ uGUI builders
+        // ============================================================ uGUI helpers
 
         private static Color Panel() => new Color(0.18f, 0.20f, 0.25f);
 
@@ -242,8 +401,8 @@ namespace GorillaCaster
         {
             if (_round == null)
             {
-                var t = TextureGen.RoundedRect(36, 14, Color.white);
-                _round = Sprite.Create(t, new Rect(0, 0, 36, 36), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(14, 14, 14, 14));
+                var t = TextureGen.RoundedRect(40, 16, Color.white);
+                _round = Sprite.Create(t, new Rect(0, 0, 40, 40), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(16, 16, 16, 16));
             }
             return _round;
         }
@@ -251,49 +410,44 @@ namespace GorillaCaster
         private static Font _font;
         private static Font F()
         {
-            if (_font == null)
-            {
-                try { _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { }
-                if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } }
-            }
+            if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { } if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } } }
             return _font;
         }
 
         private static void SetRect(RectTransform rt, float x, float y, float w, float h)
         {
-            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(x, y);
-            rt.sizeDelta = new Vector2(w, h);
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f); rt.pivot = new Vector2(0.5f, 0.5f);
+            rt.anchoredPosition = new Vector2(x, y); rt.sizeDelta = new Vector2(w, h);
         }
 
-        private static Image MkImage(Transform parent, string n, Sprite sprite, Color col)
+        private static Image MkImage(Transform parent, string n, Sprite sprite, Color col, float x, float y, float w, float h)
         {
-            var go = new GameObject(n, typeof(Image));
-            go.transform.SetParent(parent, false);
-            var img = go.GetComponent<Image>();
-            img.sprite = sprite; img.type = Image.Type.Sliced; img.color = col; img.raycastTarget = false;
-            return img;
+            var go = new GameObject(n, typeof(Image)); go.transform.SetParent(parent, false);
+            var img = go.GetComponent<Image>(); img.sprite = sprite; img.type = Image.Type.Sliced; img.color = col; img.raycastTarget = false;
+            SetRect(img.rectTransform, x, y, w, h); return img;
+        }
+        private static RawImage MkRaw(Transform parent, string n, float x, float y, float w, float h)
+        {
+            var go = new GameObject(n, typeof(RawImage)); go.transform.SetParent(parent, false);
+            var ri = go.GetComponent<RawImage>(); ri.raycastTarget = false; SetRect((RectTransform)go.transform, x, y, w, h); return ri;
+        }
+        private static Text MkText(Transform parent, string n, string text, int size, Color col, float x, float y, float w, float h, TextAnchor anchor)
+        {
+            var go = new GameObject(n, typeof(Text)); go.transform.SetParent(parent, false);
+            var tt = go.GetComponent<Text>(); tt.font = F(); tt.text = text; tt.fontSize = size; tt.fontStyle = FontStyle.Bold;
+            tt.alignment = anchor; tt.color = col; tt.horizontalOverflow = HorizontalWrapMode.Overflow; tt.verticalOverflow = VerticalWrapMode.Overflow; tt.raycastTarget = false;
+            SetRect(tt.rectTransform, x, y, w, h); return tt;
         }
 
-        private static RawImage MkRaw(Transform parent, string n)
+        private static int FreeLayer()
         {
-            var go = new GameObject(n, typeof(RawImage));
-            go.transform.SetParent(parent, false);
-            var ri = go.GetComponent<RawImage>(); ri.raycastTarget = false;
-            return ri;
+            for (int l = 31; l >= 8; l--) { try { if (string.IsNullOrEmpty(LayerMask.LayerToName(l))) return l; } catch { } }
+            return 0;
         }
-
-        private static Text MkText(Transform parent, string n, string text, int size, Color col)
+        private static void SetLayer(GameObject go, int layer)
         {
-            var go = new GameObject(n, typeof(Text));
-            go.transform.SetParent(parent, false);
-            var t = go.GetComponent<Text>();
-            t.font = F(); t.text = text; t.fontSize = size; t.fontStyle = FontStyle.Bold;
-            t.alignment = TextAnchor.MiddleCenter; t.color = col;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow; t.verticalOverflow = VerticalWrapMode.Overflow;
-            t.raycastTarget = false;
-            return t;
+            go.layer = layer;
+            foreach (Transform c in go.transform) SetLayer(c.gameObject, layer);
         }
 
         // ============================================================ primitives
@@ -304,23 +458,19 @@ namespace GorillaCaster
             Strip(go); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localScale = size;
             Paint(go.GetComponent<Renderer>(), col, emissive); return go;
         }
-
         private static GameObject Cyl(Transform parent, Vector3 pos, float radius, float halfLen, Color col, bool emissive = false)
         {
             var go = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
             Strip(go); go.transform.SetParent(parent, false); go.transform.localPosition = pos; go.transform.localScale = new Vector3(radius * 2f, halfLen, radius * 2f);
             Paint(go.GetComponent<Renderer>(), col, emissive); return go;
         }
-
         private static void Strip(GameObject go) { var c = go.GetComponent<Collider>(); if (c != null) UnityEngine.Object.Destroy(c); }
 
         private static Shader _shader;
         private static void Paint(Renderer r, Color col, bool emissive)
         {
             if (r == null) return;
-            if (_shader == null)
-                _shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit")
-                          ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
+            if (_shader == null) _shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Simple Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
             var m = new Material(_shader); m.color = col;
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", col);
             if (emissive) { m.EnableKeyword("_EMISSION"); if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", col); }

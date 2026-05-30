@@ -432,17 +432,39 @@ namespace GorillaCaster
         // Wire the in-VR phone's on-screen buttons to mod actions.
         private void WirePhone()
         {
-            _goPro.OnNext = () => CycleTarget(1);
-            _goPro.OnPrev = () => CycleTarget(-1);
-            _goPro.OnCycleMode = CycleMode;
-            _goPro.OnToggleView = () => _goPro.Viewfinder = !_goPro.Viewfinder;
-            _goPro.OnFovUp = () => _fov = Mathf.Clamp(_fov + 5f, 10f, 120f);
-            _goPro.OnFovDown = () => _fov = Mathf.Clamp(_fov - 5f, 10f, 120f);
-            _goPro.OnTime = CycleTimeOfDay;
-            _goPro.OnHide = () => _hudHidden = !_hudHidden;
-            _goPro.OnDirector = () => _autoDirector = !_autoDirector;
-            _goPro.OnShot = Screenshot;
-            _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°";
+            _goPro.OnCommand = HandleTabletCommand;
+            _goPro.StatusText = () => $"{ModeNames[(int)_mode]}  {(int)_fov}°";
+        }
+
+        private void HandleTabletCommand(string cmd)
+        {
+            switch (cmd)
+            {
+                case "mode": CycleMode(); break;
+                case "fov+": _fov = Mathf.Clamp(_fov + 5f, 10f, 120f); break;
+                case "fov-": _fov = Mathf.Clamp(_fov - 5f, 10f, 120f); break;
+                case "view": _goPro.Viewfinder = !_goPro.Viewfinder; break;
+                case "orbit": _orbit = !_orbit; break;
+                case "fp": SetMode(CamMode.FirstPerson); break;
+                case "next": CycleTarget(1); break;
+                case "prev": CycleTarget(-1); break;
+                case "auto": _autoCast = !_autoCast; break;
+                case "dir": _autoDirector = !_autoDirector; break;
+                case "day": SetTime(3); break;
+                case "night": SetTime(0); break;
+                case "rain": SetWeather(BetterDayNightManager.WeatherType.Raining); break;
+                case "clear": SetWeather(BetterDayNightManager.WeatherType.None); break;
+                case "filter": _filter = (_filter + 1) % Filters.Names.Length; break;
+                case "vignette": _vignette = _vignette > 0.5f ? 0f : 0.6f; break;
+                case "aspect": _aspect = (_aspect + 1) % Filters.AspectNames.Length; break;
+                case "grid": _thirds = !_thirds; break;
+                case "timer": _comp.ShowTimer = !_comp.ShowTimer; break;
+                case "score": _comp.ShowScoreboard = !_comp.ShowScoreboard; break;
+                case "tstart": if (_comp.Running) _comp.StopTimer(); else _comp.StartTimer(); break;
+                case "treset": _comp.ResetTimer(); break;
+                case "hud": _hudHidden = !_hudHidden; break;
+                case "shot": Screenshot(); break;
+            }
         }
 
 
