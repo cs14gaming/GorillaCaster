@@ -55,6 +55,16 @@ namespace GorillaCaster
 
         public static Texture2D Circle(int size, Color col) => RoundedRect(size, size / 2, col);
 
+        /// <summary>Vertical gradient (bottom -> top).</summary>
+        public static Texture2D Gradient(int h, Color bottom, Color top)
+        {
+            var t = new Texture2D(1, h, TextureFormat.RGBA32, false);
+            for (int y = 0; y < h; y++) t.SetPixel(0, y, Color.Lerp(bottom, top, y / (float)(h - 1)));
+            t.Apply();
+            t.hideFlags = HideFlags.HideAndDontSave; t.wrapMode = TextureWrapMode.Clamp; t.filterMode = FilterMode.Bilinear;
+            return t;
+        }
+
         /// <summary>Vignette: transparent centre fading to opaque dark at the edges/corners.</summary>
         public static Texture2D Vignette(int size, Color edge)
         {

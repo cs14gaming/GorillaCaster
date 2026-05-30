@@ -209,6 +209,7 @@ namespace GorillaCaster
 
             RefreshRigs();
             _goPro.CastingCam = _cam;
+            _goPro.ActiveCmd = _mode == CamMode.FirstPerson ? "fp" : _mode == CamMode.Selfie ? "selfie" : "";
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             VrNametags.Enabled = _vrNametags; VrNametags.ShowVelocity = _vrNametagVel; VrNametags.Size = _vrNametagSize;
