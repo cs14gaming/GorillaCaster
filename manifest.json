@@ -1,8 +1,8 @@
 {
   "name": "GorillaCaster",
-  "version_number": "1.2.0",
+  "version_number": "1.3.0",
   "website_url": "",
-  "description": "Casting / spectator camera mod for Gorilla Tag: follow/freecam/first-person/gopro/tripod/selfie cameras, instant replay, cinematic dolly paths, nametags, minimap, velocity readouts, and stream overlays.",
+  "description": "The best Gorilla Tag casting mod: a real grabbable GoPro, instant replay, follow/freecam/first-person/tripod/selfie cameras, cinematic dolly paths, nametags, minimap, velocity readouts, and a full themed stream-overlay HUD.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2100"
   ]

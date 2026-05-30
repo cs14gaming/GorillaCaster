@@ -68,7 +68,7 @@ namespace GorillaCaster
                 Color chip = sel ? new Color(r.playerColor.r, r.playerColor.g, r.playerColor.b, 0.55f)
                                   : new Color(0f, 0f, 0f, 0.5f);
                 Styles.Fill(rect, chip);
-                if (sel) Styles.Fill(new Rect(rect.x, rect.yMax, rect.width, 2f), Styles.BrandAccent);
+                if (sel) Styles.Fill(new Rect(rect.x, rect.yMax, rect.width, 2f), Styles.Accent);
 
                 // shadow + text
                 var sh = rect; sh.x += 1; sh.y += 1;

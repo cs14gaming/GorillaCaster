@@ -12,10 +12,13 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
   - **FreeCam** – fly anywhere: `WASD` move, `Space`/`Ctrl` up-down, `Shift` ×3 speed,
     `Alt` slow, hold **right-mouse** to look, scroll to zoom.
   - **First Person** – snaps to the cast player's head.
-  - **GoPro** – hard-mounts the camera to a player's head / hand / body (with offset sliders)
-    for action-cam shots that move with them.
+  - **GoPro** – a **real grabbable GoPro prop** (with a model): reach out and squeeze **grip**
+    to pick it up, release to drop it in mid-air (sticky placement). GoPro mode broadcasts
+    from its lens — hold it for moving shots or plant it for static ones.
   - **Tripod** – plant a static camera anywhere; it stays put and auto-tracks the cast player.
   - **Selfie** – sits in front of the player's face looking back.
+- **Clean First-Person** – first-person mode bumps the *casting* camera's near-clip so your own
+  head cosmetics disappear from the broadcast, while your VR view stays untouched.
 - **Instant Replay** – continuously buffers every player's motion, then replays it so you can
   rewind, **slow-mo** (0.1–2×), and scrub a moment — while flying the camera freely. `F6`
   record, `F7` play/stop, drag the on-screen bar to scrub.
@@ -77,10 +80,12 @@ Launch the game and press **Right Ctrl**.
 |------|---------|
 | `src/Plugin.cs` | BepInEx entry point + config |
 | `src/CasterController.cs` | Main loop: camera, input, menu, overlays |
+| `src/GoProProp.cs` | Procedural grabbable GoPro model + VR grab logic |
 | `src/DollyPath.cs` | Keyframed Catmull-Rom director path |
 | `src/ReplayRecorder.cs` | Instant-replay buffer + playback |
 | `src/HudExtras.cs` | Nametags, minimap, velocity, shared rig helpers |
-| `src/Styles.cs` | IMGUI theme / textures |
+| `src/Styles.cs` | IMGUI dark theme / textures |
+| `src/UI.cs` | Themed widgets (sliders, toggles, buttons) |
 
 > Use it for content creation / casting in private & modded lobbies, per Gorilla Tag's
 > modding policy. Don't use mods in public matchmaking.
