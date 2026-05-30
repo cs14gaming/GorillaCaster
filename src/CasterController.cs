@@ -47,7 +47,12 @@ namespace GorillaCaster
 
         // orbit / selfie / tripod
         private bool _orbit;
-        private float _orbitSpeed = 25f, _orbitAngle;
+        private float _orbitSpeed = 25f, _orbitAngle, _orbitPitch;
+
+        // collision + dutch roll
+        private bool _collision = true;
+        private float _collisionRadius = 0.18f;
+        private float _roll = 0f;
         private float _selfieDist = 0.6f;
         private Vector3 _tripodPos;
         private bool _tripodSet;
@@ -264,12 +269,24 @@ namespace GorillaCaster
                     behind.y = 0f;
                     if (behind.sqrMagnitude < 0.001f) behind = -head.forward;
                     behind.Normalize();
+                    behind = Quaternion.AngleAxis(-_orbitPitch, Vector3.Cross(behind, Vector3.up)) * behind; // pitch
                     Vector3 lead = Vector3.ClampMagnitude(CasterUtil.Velocity(_target), 9f) * (_followLead * 0.10f);
                     Vector3 lookAt = head.position + Vector3.up * 0.05f + lead;
                     desiredPos = head.position + behind * _followDistance + Vector3.up * _followHeight - lead * 0.25f;
                     desiredRot = Quaternion.LookRotation(lookAt - desiredPos, Vector3.up);
                     break;
             }
+
+            // camera collision: don't clip through walls between the target and the camera
+            if (_collision && _target != null)
+            {
+                Vector3 pivot = head.position + Vector3.up * 0.05f;
+                Vector3 d = desiredPos - pivot; float dist = d.magnitude;
+                if (dist > 0.05f && Physics.SphereCast(pivot, _collisionRadius, d / dist, out RaycastHit hit, dist, ~0, QueryTriggerInteraction.Ignore))
+                    desiredPos = pivot + d / dist * Mathf.Max(0.1f, hit.distance - 0.04f);
+            }
+            // dutch / roll tilt
+            if (Mathf.Abs(_roll) > 0.01f) desiredRot = desiredRot * Quaternion.Euler(0, 0, _roll);
 
             float pk = SmoothK(_moveSmoothing), rk = SmoothK(_rotSmoothing);
             _cam.transform.position = Vector3.Lerp(_cam.transform.position, desiredPos, pk);
@@ -296,7 +313,9 @@ namespace GorillaCaster
                 Vector2 d = mouse.delta.ReadValue();
                 _yaw += d.x * 0.15f; _pitch = Mathf.Clamp(_pitch - d.y * 0.15f, -89f, 89f);
             }
-            t.rotation = Quaternion.Euler(_pitch, _yaw, 0f);
+            if (kb.qKey.isPressed) _roll -= 30f * Time.deltaTime;
+            if (kb.eKey.isPressed) _roll += 30f * Time.deltaTime;
+            t.rotation = Quaternion.Euler(_pitch, _yaw, _roll);
 
             float speed = _freeSpeed * Time.deltaTime;
             if (kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed) speed *= 3f;
@@ -695,6 +714,7 @@ namespace GorillaCaster
                 _followLead = UI.Slider("Lead (anticipate motion)", _followLead, 0f, 1f);
                 _orbit = UI.Toggle("Auto-orbit  (Q/E manual)", _orbit);
                 if (_orbit) _orbitSpeed = UI.Slider("Orbit Speed", _orbitSpeed, -120f, 120f, "0");
+                _orbitPitch = UI.Slider("Orbit pitch", _orbitPitch, -60f, 80f, "0");
             }
             else if (_mode == CamMode.FirstPerson)
             {
@@ -725,8 +745,29 @@ namespace GorillaCaster
                 UI.Note("Broadcast renders from the grabbable phone's lens — see the Phone tab.");
             }
 
+            UI.Header("Rig");
+            _collision = UI.Toggle("Camera collision (no wall clip)", _collision);
+            if (_collision) _collisionRadius = UI.Slider("Collision radius", _collisionRadius, 0.05f, 0.5f);
+            _roll = UI.Slider("Dutch roll", _roll, -45f, 45f, "0");
+            if (UI.Button("Frame all players")) FrameAll();
+
             GUILayout.Space(6);
             if (UI.Button("📸  Screenshot  (F11)")) Screenshot();
+        }
+
+        private void FrameAll()
+        {
+            if (_rigs.Count == 0 || _cam == null) return;
+            Vector3 c = Vector3.zero; int n = 0;
+            foreach (var r in _rigs) { if (r != null) { c += CasterUtil.HeadPos(r); n++; } }
+            if (n == 0) return; c /= n;
+            float ext = 2f;
+            foreach (var r in _rigs) { if (r != null) ext = Mathf.Max(ext, Vector3.Distance(CasterUtil.HeadPos(r), c)); }
+            SetMode(CamMode.FreeCam);
+            float d = ext / Mathf.Tan(_fov * 0.5f * Mathf.Deg2Rad) + ext * 0.6f;
+            _cam.transform.position = c + new Vector3(0, ext * 0.5f, -d);
+            _cam.transform.LookAt(c);
+            _freeInit = false;
         }
 
         private void GoProTab()
