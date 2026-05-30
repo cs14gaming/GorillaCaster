@@ -229,10 +229,17 @@ namespace GorillaCaster
         public void SummonToHand()
         {
             EnsureSpawned();
-            var tagger = GorillaTagger.Instance;
-            Transform t = tagger != null ? tagger.leftHandTransform : null;
-            if (t != null) { Root.transform.position = t.position + t.up * 0.06f; }
-            else if (Camera.main != null) Root.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 0.6f;
+            Transform h = HeadTransform();
+            if (h != null)
+            {
+                // float it out in front of you, facing you, so it's easy to grab
+                Root.transform.position = h.position + h.forward * 0.45f - h.up * 0.08f;
+                Root.transform.rotation = Quaternion.LookRotation(h.position - Root.transform.position, Vector3.up);
+            }
+            else if (Camera.main != null)
+            {
+                Root.transform.position = Camera.main.transform.position + Camera.main.transform.forward * 0.5f;
+            }
             _popT = 0f; Held = false;
         }
 
@@ -276,11 +283,15 @@ namespace GorillaCaster
                 if (holding != 1) Touch(1, Tip(false));
             }
 
-            // always billboard the screen to the head so it's readable & never mirrored
-            Vector3 head = HeadPos();
-            if (head != Vector3.zero)
-                Root.transform.rotation = Quaternion.Slerp(Root.transform.rotation,
-                    Quaternion.LookRotation(Root.transform.position - head, Vector3.up), 0.35f);
+            // billboard the screen toward the head ONLY while held (so it's readable & not mirrored).
+            // When not held it stays put so you can actually reach out and grab it.
+            if (Held)
+            {
+                Vector3 head = HeadPos();
+                if (head != Vector3.zero)
+                    Root.transform.rotation = Quaternion.Slerp(Root.transform.rotation,
+                        Quaternion.LookRotation(head - Root.transform.position, Vector3.up), 0.4f);
+            }
 
             Animate();
         }
@@ -380,9 +391,14 @@ namespace GorillaCaster
 
         private static Vector3 HeadPos()
         {
+            var t = HeadTransform();
+            return t != null ? t.position : Vector3.zero;
+        }
+        private static Transform HeadTransform()
+        {
             var t = GorillaTagger.Instance;
-            if (t != null && t.mainCamera != null) return t.mainCamera.transform.position;
-            return Camera.main != null ? Camera.main.transform.position : Vector3.zero;
+            if (t != null && t.mainCamera != null) return t.mainCamera.transform;
+            return Camera.main != null ? Camera.main.transform : null;
         }
         private static Transform Tip(bool right)
         {
