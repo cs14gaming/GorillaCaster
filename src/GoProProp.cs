@@ -39,9 +39,10 @@ namespace GorillaCaster
         private Quaternion _localRot;
         private Vector2 _smoothLp;
         private bool _trigPrev;
-        private int _hoverIdx = -1, _lastHoverSound = -1;
+        private int _hoverIdx = -1, _lastHoverSound = -1, _hoverPrev = -1;
         private const float GrabRadius = 0.42f;
-        private const int UiLayer = 5;     // built-in UI layer (excluded from the preview camera)
+        private const int UiLayer = 5;     // built-in UI layer (excluded from the preview + casting cameras)
+        public int Layer => UiLayer;
         private const float CW = 780f, CH = 470f, S = 0.00052f;
 
         private class Btn
@@ -251,31 +252,38 @@ namespace GorillaCaster
             }
             if (_laser != null) { _laser.SetPosition(0, origin); _laser.SetPosition(1, hit ? hitW : origin + dir * 1f); }
 
+            int hovered = -1;
             if (hit)
             {
                 _smoothLp = Vector2.Lerp(_smoothLp, lp2, 0.55f); lp2 = _smoothLp;   // de-jitter the pointer
                 if (_cursor != null) SetRect(_cursor.rectTransform, lp2.x, lp2.y, 26, 26);
-                int hovered = -1;
                 for (int i = 0; i < _btns.Count; i++)
                 {
                     var b = _btns[i];
-                    if (Mathf.Abs(lp2.x - b.c.x) <= b.half.x && Mathf.Abs(lp2.y - b.c.y) <= b.half.y) { hovered = i; break; }
+                    if (Mathf.Abs(lp2.x - b.c.x) <= b.half.x * 1.25f && Mathf.Abs(lp2.y - b.c.y) <= b.half.y * 1.25f) { hovered = i; break; }
                 }
-                if (hovered >= 0)
-                {
-                    _btns[hovered].hover = 1f; _hoverIdx = hovered;
-                    if (trigger && !_trigPrev)
-                    {
-                        var b = _btns[hovered];
-                        b.flash = 1f; b.scale = 0.86f;
-                        if (_audio != null && _click != null) _audio.PlayOneShot(_click, 0.7f);
-                        try { b.act?.Invoke(); } catch (Exception e) { Debug.LogWarning("[GorillaCaster] btn: " + e.Message); }
-                        try { if (GorillaTagger.Instance != null) GorillaTagger.Instance.StartVibration(false, 0.6f, 0.05f); } catch { }
-                    }
-                }
+                if (hovered >= 0) { _btns[hovered].hover = 1f; _hoverIdx = hovered; }
             }
+
+            // click the button we were aiming at BEFORE the trigger pull (so the finger-curl drift doesn't matter)
+            if (trigger && !_trigPrev)
+            {
+                int target = _hoverPrev >= 0 ? _hoverPrev : hovered;
+                if (target >= 0) Click(target);
+            }
+            _hoverPrev = hovered;
             _trigPrev = trigger;
             return hit;
+        }
+
+        private void Click(int i)
+        {
+            if (i < 0 || i >= _btns.Count) return;
+            var b = _btns[i];
+            b.flash = 1f; b.scale = 0.86f;
+            if (_audio != null && _click != null) _audio.PlayOneShot(_click, 0.7f);
+            try { b.act?.Invoke(); } catch (Exception e) { Debug.LogWarning("[GorillaCaster] btn: " + e.Message); }
+            try { if (GorillaTagger.Instance != null) GorillaTagger.Instance.StartVibration(false, 0.6f, 0.05f); } catch { }
         }
 
         private void Animate()

@@ -202,6 +202,7 @@ namespace GorillaCaster
         private void DriveCamera()
         {
             if (_cam == null) return;
+            if (_goPro.Spawned) _cam.cullingMask &= ~(1 << _goPro.Layer);   // never broadcast the tablet UI to the monitor
             _cam.fieldOfView = _fov;
             _cam.nearClipPlane = (_mode == CamMode.FirstPerson && _fpHideSelf) ? _fpNearClip : _nearClip;
 
