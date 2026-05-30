@@ -1,8 +1,8 @@
 {
   "name": "GorillaCaster",
-  "version_number": "1.4.0",
+  "version_number": "1.5.0",
   "website_url": "",
-  "description": "Spooder's Camera Mod — a premium Gorilla Tag casting mod: a grabbable LIV-style camera with a live viewfinder, instant replay, follow/freecam/first-person/tripod/selfie cameras, cinematic dolly paths, reworked nametags, minimap, velocity readouts, watermark, and a rounded Sakuraa-grade overlay HUD.",
+  "description": "Spooder's Camera Mod — a premium Gorilla Tag casting mod: a real in-VR phone with a live viewfinder and poke-able on-screen controls, instant replay, follow/freecam/first-person/tripod/selfie cameras, cinematic dolly paths, reworked nametags, minimap, velocity readouts, watermark, and a rounded Sakuraa-grade overlay HUD.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2100"
   ]

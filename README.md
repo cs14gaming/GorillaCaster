@@ -12,11 +12,11 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
   - **FreeCam** – fly anywhere: `WASD` move, `Space`/`Ctrl` up-down, `Shift` ×3 speed,
     `Alt` slow, hold **right-mouse** to look, scroll to zoom.
   - **First Person** – snaps to the cast player's head.
-  - **GoPro / LIV Camera** – a **real grabbable LIV-style camera** with a sleek model and a
-    **live viewfinder screen** showing what the lens sees. Reach out and squeeze **grip** to
-    pick it up, release to drop it in mid-air (sticky placement). On-camera options: live
-    viewfinder, **stabilization**, **auto-level horizon**, and FOV. GoPro mode broadcasts from
-    its lens — hold it for moving shots or plant it for static ones.
+  - **Phone** – a **real in-VR phone** running a camera app. It has a **live viewfinder screen**
+    and **poke-able on-screen buttons** (REC · MODE · FOV-/FOV+ · VIEW · TIME): hold it in one
+    hand and tap the screen with the other to control the mod **without the PC**. Squeeze **grip**
+    to pick it up, release to drop it (sticky placement). Phone mode broadcasts from its lens, with
+    **stabilization** and **auto-level** options.
   - **Tripod** – plant a static camera anywhere; it stays put and auto-tracks the cast player.
   - **Selfie** – sits in front of the player's face looking back.
 - **Clean First-Person** – first-person mode bumps the *casting* camera's near-clip so your own
@@ -98,7 +98,7 @@ runtime errors.
 |------|---------|
 | `src/Plugin.cs` | BepInEx entry point + config |
 | `src/CasterController.cs` | Main loop: camera, input, menu, overlays |
-| `src/GoProProp.cs` | Grabbable LIV-style camera: model, viewfinder, VR grab |
+| `src/GoProProp.cs` | Grabbable in-VR phone: model, viewfinder, poke buttons, grab |
 | `src/DollyPath.cs` | Keyframed Catmull-Rom director path |
 | `src/ReplayRecorder.cs` | Instant-replay buffer + playback |
 | `src/HudExtras.cs` | Nametags, minimap, watermark, velocity, helpers |

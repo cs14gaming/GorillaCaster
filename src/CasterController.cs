@@ -20,9 +20,9 @@ namespace GorillaCaster
         private enum CamMode { Follow, FreeCam, FirstPerson, GoPro, Tripod, Selfie }
 
         private static readonly string[] ModeNames =
-            { "Follow", "FreeCam", "First Person", "GoPro", "Tripod", "Selfie" };
+            { "Follow", "FreeCam", "First Person", "Phone", "Tripod", "Selfie" };
         private static readonly string[] TabNames =
-            { "Camera", "GoPro", "Players", "Replay", "Director", "World", "Overlays" };
+            { "Camera", "Phone", "Players", "Replay", "Director", "World", "Overlays" };
 
         // ---- camera ----
         private Camera _cam;
@@ -98,6 +98,7 @@ namespace GorillaCaster
                 if (Plugin.WatermarkEnabled != null) _watermark = Plugin.WatermarkEnabled.Value;
                 if (Plugin.WatermarkText != null) _watermarkText = Plugin.WatermarkText.Value;
                 if (Plugin.WatermarkOpacity != null) _watermarkOpacity = Plugin.WatermarkOpacity.Value;
+                WirePhone();
             }
             catch { }
         }
@@ -322,6 +323,25 @@ namespace GorillaCaster
 
         private void CycleMode() => SetMode((CamMode)(((int)_mode + 1) % ModeNames.Length));
 
+        private static readonly int[] TimePresets = { 0, 1, 3, 7 };
+        private int _timeIdx = 1;
+        private void CycleTimeOfDay() { _timeIdx = (_timeIdx + 1) % TimePresets.Length; SetTime(TimePresets[_timeIdx]); }
+
+        // Wire the in-VR phone's on-screen buttons to mod actions.
+        private void WirePhone()
+        {
+            _goPro.OnRecord = ToggleRecording;
+            _goPro.OnPlay = ToggleReplay;
+            _goPro.OnCycleMode = CycleMode;
+            _goPro.OnToggleView = () => _goPro.Viewfinder = !_goPro.Viewfinder;
+            _goPro.OnFovUp = () => _fov = Mathf.Clamp(_fov + 5f, 10f, 120f);
+            _goPro.OnFovDown = () => _fov = Mathf.Clamp(_fov - 5f, 10f, 120f);
+            _goPro.OnTime = CycleTimeOfDay;
+            _goPro.OnHide = () => _hudHidden = !_hudHidden;
+            _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°" + (_replay.Recording ? "   REC" : "");
+            _goPro.IsRecording = () => _replay.Recording;
+        }
+
         private void ToggleRecording() { if (_replay.Recording) _replay.StopRecording(); else _replay.StartRecording(); }
         private void ToggleReplay() { if (_replay.Playing) _replay.Stop(); else _replay.Play(0f); }
 
@@ -533,7 +553,7 @@ namespace GorillaCaster
             }
             else if (_mode == CamMode.GoPro)
             {
-                UI.Note("GoPro camera renders from the grabbable prop — see the GoPro tab.");
+                UI.Note("Broadcast renders from the grabbable phone's lens — see the Phone tab.");
             }
 
             GUILayout.Space(6);
@@ -542,28 +562,28 @@ namespace GorillaCaster
 
         private void GoProTab()
         {
-            UI.Header("LIV Camera");
-            UI.Note("A sleek handheld camera with a live viewfinder screen. Grab it with GRIP and place it anywhere — hold it for moving shots, drop it for static ones.");
+            UI.Header("Camera Phone");
+            UI.Note("A real in-VR phone with a live viewfinder and on-screen buttons. Grab it with GRIP, then poke the screen with your free hand to record, change mode, FOV, viewfinder and time — control everything without the PC.");
 
             GUILayout.Space(2);
             GUILayout.Label(_goPro.Spawned ? (_goPro.Held ? "Status:  <color=#5cf08a>● held</color>" : "Status:  <color=#46c8ff>● placed</color>") : "Status:  not spawned", Styles.Hud);
 
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
-            if (UI.SmallButton(_goPro.Spawned ? "Summon to hand" : "Spawn", 148)) _goPro.SummonToHand();
+            if (UI.SmallButton(_goPro.Spawned ? "Summon to hand" : "Spawn phone", 148)) _goPro.SummonToHand();
             if (UI.SmallButton("Despawn", 110)) _goPro.Despawn();
             GUILayout.EndHorizontal();
-            if (UI.Primary(_mode == CamMode.GoPro ? "● Broadcasting Camera" : "Broadcast this camera")) SetMode(CamMode.GoPro);
+            if (UI.Primary(_mode == CamMode.GoPro ? "● Broadcasting phone" : "Broadcast phone camera")) SetMode(CamMode.GoPro);
 
             UI.Header("Camera Options");
             _goPro.Viewfinder = UI.Toggle("Live viewfinder screen", _goPro.Viewfinder);
             _goProAutoLevel = UI.Toggle("Auto-level horizon", _goProAutoLevel);
             _goProStabilize = UI.Slider("Stabilization", _goProStabilize, 0f, 0.92f);
             _fov = UI.Slider("Camera FOV", _fov, 10f, 120f, "0");
-            UI.Note("Stabilization smooths shaky hand movement. Auto-level keeps the horizon flat. FOV also drives the viewfinder.");
+            UI.Note("On-screen buttons: REC · MODE · FOV-/FOV+ · VIEW · TIME. Stabilization smooths shaky hands; auto-level keeps the horizon flat.");
 
-            UI.Header("How to grab");
-            UI.Note("Reach a hand to the camera and squeeze GRIP to pick it up. Release to drop it — it floats exactly where you let go.");
+            UI.Header("How to use");
+            UI.Note("Reach a hand to the phone and squeeze GRIP to hold it. Hold it in one hand and poke its screen with the other. Release grip to drop it — it floats where you let go.");
         }
 
         private void PlayersTab()
