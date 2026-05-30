@@ -27,12 +27,20 @@ namespace GorillaCaster
             var t = r.headMesh != null ? r.headMesh.transform : r.transform;
             return t.position;
         }
+
+        /// <summary>Current speed of a rig in m/s, or 0 if unavailable.</summary>
+        public static float Speed(VRRig r)
+        {
+            if (r == null) return 0f;
+            try { return r.LatestVelocity().magnitude; }
+            catch { return 0f; }
+        }
     }
 
     /// <summary>World-space floating nametags + an overhead minimap, drawn in OnGUI.</summary>
     internal static class HudExtras
     {
-        public static void DrawNametags(IList<VRRig> rigs, Camera cam, VRRig target)
+        public static void DrawNametags(IList<VRRig> rigs, Camera cam, VRRig target, bool showVelocity = false)
         {
             if (cam == null) return;
             for (int i = 0; i < rigs.Count; i++)
@@ -49,6 +57,7 @@ namespace GorillaCaster
                 bool sel = r == target;
 
                 string label = CasterUtil.NameOf(r);
+                if (showVelocity) label += $"  <color=#9fe0ff>{CasterUtil.Speed(r):0.0}</color>";
                 if (it) label += "  <color=#ff5555>[IT]</color>";
 
                 var size = Styles.Tag.CalcSize(new GUIContent(label));
