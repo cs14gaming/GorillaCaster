@@ -3,87 +3,96 @@ using UnityEngine;
 namespace GorillaCaster
 {
     /// <summary>
-    /// Dark theme for the caster HUD + menu: solid-color textures and pre-built GUIStyles.
+    /// Premium dark theme: rounded panels, soft shadows, switch toggles, rounded sliders.
     /// </summary>
     internal static class Styles
     {
         private static bool _built;
 
         // palette
-        public static readonly Color Accent = new Color(0.36f, 0.78f, 1f);
-        public static readonly Color Accent2 = new Color(1f, 0.33f, 0.46f);
-        public static readonly Color BgCol = new Color(0.082f, 0.090f, 0.110f, 0.98f);
-        public static readonly Color RailCol = new Color(0.055f, 0.062f, 0.078f, 1f);
-        public static readonly Color PanelCol = new Color(0.130f, 0.145f, 0.170f, 1f);
-        public static readonly Color PanelHi = new Color(0.180f, 0.200f, 0.230f, 1f);
-        public static readonly Color SubText = new Color(0.66f, 0.71f, 0.78f);
+        public static readonly Color Accent = new Color(0.27f, 0.78f, 1f);     // cyan
+        public static readonly Color Accent2 = new Color(1f, 0.30f, 0.55f);    // magenta
+        public static readonly Color BgCol = new Color(0.066f, 0.074f, 0.094f, 0.99f);
+        public static readonly Color RailCol = new Color(0.045f, 0.050f, 0.066f, 1f);
+        public static readonly Color CardCol = new Color(0.108f, 0.120f, 0.150f, 1f);
+        public static readonly Color PanelCol = new Color(0.140f, 0.156f, 0.190f, 1f);
+        public static readonly Color PanelHi = new Color(0.200f, 0.222f, 0.270f, 1f);
+        public static readonly Color SubText = new Color(0.62f, 0.68f, 0.77f);
 
         // textures
-        public static Texture2D White, Bg, Rail, Panel, PanelHover, AccentTex, AccentDim, Track, Thumb, ToggleOff;
+        public static Texture2D White, Card, Btn, BtnHi, BtnAccent, Pill, TrackTex, ThumbTex, Shadow, RailPillTex, SwitchOn, SwitchOff, Knob, TagBg, TagGlow;
 
         // styles
-        public static GUIStyle Title, Brand, Header, Label, Value, Sub, Hud, Btn, RailBtn, RailBtnOn, Slider, SliderThumb, Pill, Tag, TagShadow, LowerThirdName, LowerThirdSub, BoxNote;
+        public static GUIStyle Brand, Title, Header, Label, Value, Sub, Hud, BtnS, BtnPrimaryS, RailS, RailOnS, SliderS, ThumbS, PillS, Tag, TagShadow, LowerThirdName, LowerThirdSub, Note, Water;
 
         public static void Ensure()
         {
             if (_built) return;
             _built = true;
 
-            White = Solid(Color.white);
-            Bg = Solid(BgCol);
-            Rail = Solid(RailCol);
-            Panel = Solid(PanelCol);
-            PanelHover = Solid(PanelHi);
-            AccentTex = Solid(Accent);
-            AccentDim = Solid(new Color(Accent.r, Accent.g, Accent.b, 0.22f));
-            Track = Solid(new Color(0.25f, 0.28f, 0.33f, 1f));
-            Thumb = Solid(Accent);
-            ToggleOff = Solid(new Color(0.28f, 0.31f, 0.36f, 1f));
+            White = TextureGen.Solid(Color.white);
+            Card = TextureGen.RoundedRect(40, 14, CardCol);
+            Btn = TextureGen.RoundedRect(26, 9, PanelCol);
+            BtnHi = TextureGen.RoundedRect(26, 9, PanelHi);
+            BtnAccent = TextureGen.RoundedRect(26, 9, Accent);
+            Pill = TextureGen.RoundedRect(28, 12, new Color(1, 1, 1, 0.05f));
+            TrackTex = TextureGen.RoundedRect(12, 5, new Color(0.26f, 0.29f, 0.35f));
+            ThumbTex = TextureGen.Circle(18, Accent);
+            Shadow = TextureGen.SoftShadow(48, new Color(0, 0, 0, 0.55f));
+            RailPillTex = TextureGen.RoundedRect(26, 10, PanelCol);
+            SwitchOn = TextureGen.RoundedRect(28, 13, Accent);
+            SwitchOff = TextureGen.RoundedRect(28, 13, new Color(0.26f, 0.29f, 0.35f));
+            Knob = TextureGen.Circle(20, Color.white);
+            TagBg = TextureGen.RoundedRect(24, 10, new Color(0.06f, 0.07f, 0.09f, 0.86f));
+            TagGlow = TextureGen.RoundedOutline(28, 12, 2, Accent);
 
-            Brand = Mk(15, FontStyle.Bold, Accent);
+            Brand = Mk(15, FontStyle.Bold, Color.white);
             Title = Mk(13, FontStyle.Bold, Color.white);
-            Header = Mk(12, FontStyle.Bold, Accent); Header.margin = new RectOffset(0, 0, 8, 4);
-            Label = Mk(12, FontStyle.Normal, Color.white);
+            Header = Mk(11, FontStyle.Bold, Accent); Header.margin = new RectOffset(2, 0, 10, 4);
+            Label = Mk(12, FontStyle.Normal, new Color(0.88f, 0.91f, 0.95f));
             Sub = Mk(11, FontStyle.Normal, SubText);
-            Value = Mk(12, FontStyle.Bold, SubText); Value.alignment = TextAnchor.MiddleRight;
-            Hud = Mk(13, FontStyle.Bold, Color.white); Hud.richText = true;
+            Value = Mk(12, FontStyle.Bold, Accent); Value.alignment = TextAnchor.MiddleRight;
+            Hud = Mk(13, FontStyle.Bold, Color.white);
+            Water = Mk(13, FontStyle.Bold, Color.white); Water.alignment = TextAnchor.MiddleRight;
 
-            Btn = new GUIStyle(GUI.skin.button) { fontSize = 12, fontStyle = FontStyle.Bold, richText = true };
-            Btn.normal.background = Panel; Btn.normal.textColor = Color.white;
-            Btn.hover.background = PanelHover; Btn.hover.textColor = Color.white;
-            Btn.active.background = AccentDim; Btn.active.textColor = Color.white;
-            Btn.border = new RectOffset(6, 6, 6, 6); Btn.padding = new RectOffset(8, 8, 6, 6);
-            Btn.margin = new RectOffset(2, 2, 2, 2);
+            BtnS = Btn9(Btn, BtnHi, BtnAccent, Color.white);
+            BtnPrimaryS = Btn9(BtnAccent, BtnAccent, BtnAccent, new Color(0.03f, 0.05f, 0.07f));
 
-            RailBtn = Mk(13, FontStyle.Bold, SubText);
-            RailBtn.alignment = TextAnchor.MiddleLeft; RailBtn.padding = new RectOffset(14, 4, 0, 0);
-            RailBtn.normal.background = Rail; RailBtn.hover.background = Panel; RailBtn.hover.textColor = Color.white;
+            RailS = Mk(13, FontStyle.Bold, SubText);
+            RailS.alignment = TextAnchor.MiddleLeft; RailS.padding = new RectOffset(16, 4, 0, 0);
+            RailS.hover.textColor = Color.white;
+            RailOnS = new GUIStyle(RailS);
+            RailOnS.normal.background = RailPillTex; RailOnS.border = new RectOffset(10, 10, 10, 10);
+            RailOnS.normal.textColor = Color.white; RailOnS.hover.textColor = Color.white;
 
-            RailBtnOn = new GUIStyle(RailBtn) { fontStyle = FontStyle.Bold };
-            RailBtnOn.normal.background = Panel; RailBtnOn.normal.textColor = Accent;
-            RailBtnOn.hover.background = Panel; RailBtnOn.hover.textColor = Accent;
+            SliderS = new GUIStyle(GUI.skin.horizontalSlider);
+            SliderS.normal.background = TrackTex; SliderS.fixedHeight = 8; SliderS.border = new RectOffset(5, 5, 5, 5);
+            SliderS.margin = new RectOffset(0, 0, 8, 10);
+            ThumbS = new GUIStyle(GUI.skin.horizontalSliderThumb);
+            ThumbS.normal.background = ThumbTex; ThumbS.active.background = ThumbTex; ThumbS.fixedWidth = 16; ThumbS.fixedHeight = 16; ThumbS.border = new RectOffset(8, 8, 8, 8);
 
-            Slider = new GUIStyle(GUI.skin.horizontalSlider);
-            Slider.normal.background = Track; Slider.fixedHeight = 6; Slider.border = new RectOffset(3, 3, 3, 3);
-            Slider.margin = new RectOffset(0, 0, 8, 8);
+            PillS = Mk(12, FontStyle.Bold, Color.white); PillS.alignment = TextAnchor.MiddleLeft;
+            PillS.padding = new RectOffset(12, 12, 6, 6); PillS.margin = new RectOffset(0, 0, 3, 3);
+            PillS.normal.background = Pill; PillS.border = new RectOffset(12, 12, 12, 12);
 
-            SliderThumb = new GUIStyle(GUI.skin.horizontalSliderThumb);
-            SliderThumb.normal.background = Thumb; SliderThumb.active.background = Thumb;
-            SliderThumb.fixedWidth = 14; SliderThumb.fixedHeight = 14; SliderThumb.border = new RectOffset(7, 7, 7, 7);
+            Note = Mk(11, FontStyle.Normal, SubText); Note.wordWrap = true;
+            Note.normal.background = TextureGen.RoundedRect(20, 8, new Color(1, 1, 1, 0.04f));
+            Note.border = new RectOffset(8, 8, 8, 8); Note.padding = new RectOffset(10, 10, 7, 7); Note.margin = new RectOffset(0, 0, 4, 6);
 
-            Pill = Mk(12, FontStyle.Bold, Color.white); Pill.alignment = TextAnchor.MiddleLeft;
-            Pill.padding = new RectOffset(8, 8, 4, 4); Pill.margin = new RectOffset(2, 2, 2, 2);
-            Pill.normal.background = Panel; Pill.hover.background = PanelHover; Pill.hover.textColor = Color.white;
-
-            BoxNote = Mk(11, FontStyle.Normal, SubText); BoxNote.wordWrap = true;
-            BoxNote.normal.background = Solid(new Color(1, 1, 1, 0.04f)); BoxNote.padding = new RectOffset(8, 8, 6, 6);
-            BoxNote.margin = new RectOffset(0, 0, 4, 4);
-
-            Tag = Mk(14, FontStyle.Bold, Color.white); Tag.alignment = TextAnchor.MiddleCenter; Tag.richText = true;
+            Tag = Mk(13, FontStyle.Bold, Color.white); Tag.alignment = TextAnchor.MiddleCenter;
             TagShadow = new GUIStyle(Tag); TagShadow.normal.textColor = new Color(0, 0, 0, 0.85f);
+            LowerThirdName = Mk(22, FontStyle.Bold, Color.white);
+            LowerThirdSub = Mk(13, FontStyle.Bold, new Color(0.8f, 0.85f, 0.9f));
+        }
 
-            LowerThirdName = Mk(22, FontStyle.Bold, Color.white); LowerThirdName.richText = true;
-            LowerThirdSub = Mk(13, FontStyle.Bold, new Color(0.8f, 0.85f, 0.9f)); LowerThirdSub.richText = true;
+        private static GUIStyle Btn9(Texture2D n, Texture2D h, Texture2D a, Color text)
+        {
+            var s = new GUIStyle { fontSize = 12, fontStyle = FontStyle.Bold, richText = true, alignment = TextAnchor.MiddleCenter };
+            s.normal.background = n; s.normal.textColor = text;
+            s.hover.background = h; s.hover.textColor = Color.white;
+            s.active.background = a; s.active.textColor = text;
+            s.border = new RectOffset(9, 9, 9, 9); s.padding = new RectOffset(8, 8, 6, 6); s.margin = new RectOffset(3, 3, 3, 3);
+            return s;
         }
 
         private static GUIStyle Mk(int size, FontStyle fs, Color c)
@@ -93,17 +102,26 @@ namespace GorillaCaster
             return s;
         }
 
-        private static Texture2D Solid(Color c)
-        {
-            var t = new Texture2D(1, 1, TextureFormat.RGBA32, false);
-            t.SetPixel(0, 0, c); t.Apply();
-            t.hideFlags = HideFlags.HideAndDontSave; t.wrapMode = TextureWrapMode.Clamp;
-            return t;
-        }
-
         public static void Fill(Rect r, Color c)
         {
-            var prev = GUI.color; GUI.color = c; GUI.DrawTexture(r, White); GUI.color = prev;
+            var p = GUI.color; GUI.color = c; GUI.DrawTexture(r, White); GUI.color = p;
+        }
+
+        /// <summary>Rounded panel with a soft drop shadow.</summary>
+        public static void DrawCard(Rect r, Color col, float shadow = 8f)
+        {
+            if (shadow > 0f)
+            {
+                var sr = new Rect(r.x - shadow, r.y - shadow + 3, r.width + shadow * 2, r.height + shadow * 2);
+                var p = GUI.color; GUI.color = new Color(1, 1, 1, 0.5f); GUI.DrawTexture(sr, Shadow); GUI.color = p;
+            }
+            GUI.DrawTexture(r, White, ScaleMode.StretchToFill, true, 0f, col, 0f, 14f);
+        }
+
+        /// <summary>Rounded filled rect (no shadow).</summary>
+        public static void Round(Rect r, Color col, float radius = 10f)
+        {
+            GUI.DrawTexture(r, White, ScaleMode.StretchToFill, true, 0f, col, 0f, radius);
         }
     }
 }

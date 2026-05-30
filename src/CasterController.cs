@@ -48,6 +48,10 @@ namespace GorillaCaster
         private Vector3 _tripodPos;
         private bool _tripodSet;
 
+        // gopro camera options
+        private float _goProStabilize = 0f;
+        private bool _goProAutoLevel;
+
         // freecam look
         private bool _freeInit;
         private float _yaw, _pitch;
@@ -64,6 +68,12 @@ namespace GorillaCaster
         private bool _lowerThird = true, _playerList = true, _hud = true;
         private bool _nametags = true, _nametagVelocity, _minimap;
         private bool _letterbox, _hudHidden;
+        private float _nametagScale = 1f;
+
+        // watermark
+        private bool _watermark = true;
+        private string _watermarkText = "Spooder's Camera Mod";
+        private float _watermarkOpacity = 0.55f;
 
         // ui
         private Rect _winRect = new Rect(60, 60, 640, 500);
@@ -85,6 +95,9 @@ namespace GorillaCaster
                 _fov = Plugin.DefaultFov != null ? Plugin.DefaultFov.Value : 90f;
                 if (Plugin.NametagsDefault != null) _nametags = Plugin.NametagsDefault.Value;
                 if (Plugin.MinimapDefault != null) _minimap = Plugin.MinimapDefault.Value;
+                if (Plugin.WatermarkEnabled != null) _watermark = Plugin.WatermarkEnabled.Value;
+                if (Plugin.WatermarkText != null) _watermarkText = Plugin.WatermarkText.Value;
+                if (Plugin.WatermarkOpacity != null) _watermarkOpacity = Plugin.WatermarkOpacity.Value;
             }
             catch { }
         }
@@ -152,7 +165,8 @@ namespace GorillaCaster
 
             RefreshRigs();
             _replay.Sample(_rigs, Time.deltaTime);
-            _goPro.Tick();
+            _goPro.Tick(_fov);
+            HudExtras.NametagScale = _nametagScale;
 
             if (_autoCast) AutoPickTarget();
             if (_target == null && _rigs.Count > 0) _target = _rigs[0];
@@ -173,7 +187,18 @@ namespace GorillaCaster
             {
                 if (!_goPro.Spawned) _goPro.SummonToHand();
                 if (_goPro.Lens != null)
-                    _cam.transform.SetPositionAndRotation(_goPro.Lens.position, _goPro.Lens.rotation);
+                {
+                    Vector3 p = _goPro.Lens.position;
+                    Quaternion rot = _goPro.Lens.rotation;
+                    if (_goProAutoLevel) rot = Quaternion.LookRotation(rot * Vector3.forward, Vector3.up);
+                    if (_goProStabilize > 0.01f)
+                    {
+                        float k = SmoothK(_goProStabilize);
+                        _cam.transform.position = Vector3.Lerp(_cam.transform.position, p, k);
+                        _cam.transform.rotation = Quaternion.Slerp(_cam.transform.rotation, rot, k);
+                    }
+                    else _cam.transform.SetPositionAndRotation(p, rot);
+                }
                 return;
             }
 
@@ -339,6 +364,7 @@ namespace GorillaCaster
             {
                 Styles.Ensure();
                 if (_letterbox) DrawLetterbox();
+                if (_watermark) HudExtras.DrawWatermark(_watermarkText, _watermarkOpacity);
                 if (!_hudHidden)
                 {
                     if (_nametags && _cam != null) HudExtras.DrawNametags(_rigs, _cam, _target, _nametagVelocity);
@@ -387,14 +413,14 @@ namespace GorillaCaster
         private void DrawLowerThird()
         {
             bool it = CasterUtil.IsTagged(_target);
-            float w = 420, h = 64;
+            float w = 440, h = 66;
             var r = new Rect((Screen.width - w) / 2f, Screen.height - h - 28, w, h);
-            Styles.Fill(r, new Color(0.07f, 0.08f, 0.10f, 0.92f));
-            Styles.Fill(new Rect(r.x, r.y, 8f, r.height), _target.playerColor);
-            Styles.Fill(new Rect(r.x, r.yMax - 3f, r.width, 3f), it ? Styles.Accent2 : Styles.Accent);
-            GUI.Label(new Rect(r.x + 22, r.y + 8, r.width - 30, 30), CasterUtil.NameOf(_target), Styles.LowerThirdName);
-            string sub = it ? "<color=#ff5577>● IT</color>   NOW CASTING" : "NOW CASTING";
-            GUI.Label(new Rect(r.x + 22, r.y + 38, r.width - 30, 20), sub, Styles.LowerThirdSub);
+            Styles.DrawCard(r, new Color(0.07f, 0.08f, 0.10f, 0.95f), 10f);
+            Styles.Round(new Rect(r.x + 6, r.y + 8, 7f, r.height - 16), _target.playerColor, 3.5f);
+            Styles.Round(new Rect(r.x + 16, r.yMax - 5f, r.width - 32, 3f), it ? Styles.Accent2 : Styles.Accent, 1.5f);
+            GUI.Label(new Rect(r.x + 24, r.y + 8, r.width - 30, 30), CasterUtil.NameOf(_target), Styles.LowerThirdName);
+            string sub = it ? "<color=#ff4d8d>● IT</color>   NOW CASTING" : "NOW CASTING";
+            GUI.Label(new Rect(r.x + 24, r.y + 38, r.width - 30, 20), sub, Styles.LowerThirdSub);
         }
 
         private void DrawRecIndicator()
@@ -409,12 +435,12 @@ namespace GorillaCaster
             var r = new Rect((Screen.width - w) / 2f, Screen.height - h - 6, w, h);
             Styles.Fill(r, new Color(0.05f, 0.06f, 0.08f, 0.9f));
             Styles.Fill(new Rect(r.x, r.y, w, 2f), Styles.Accent);
-            if (GUI.Button(new Rect(r.x + 8, r.y + 10, 60, 26), _replay.Playing ? "Pause" : "Play", Styles.Btn))
+            if (GUI.Button(new Rect(r.x + 8, r.y + 10, 60, 26), _replay.Playing ? "Pause" : "Play", Styles.BtnS))
                 { if (_replay.Playing) _replay.Stop(); else _replay.Play(_replay.Playhead >= _replay.Length ? 0f : _replay.Playhead); }
-            float v = GUI.HorizontalSlider(new Rect(r.x + 78, r.y + 22, w - 230, 12), _replay.Playhead, 0f, Mathf.Max(0.01f, _replay.Length), Styles.Slider, Styles.SliderThumb);
+            float v = GUI.HorizontalSlider(new Rect(r.x + 78, r.y + 22, w - 230, 12), _replay.Playhead, 0f, Mathf.Max(0.01f, _replay.Length), Styles.SliderS, Styles.ThumbS);
             if (Mathf.Abs(v - _replay.Playhead) > 0.005f) { _replay.Stop(); _replay.Playhead = v; _replay.ApplyAt(v); }
             GUI.Label(new Rect(r.xMax - 140, r.y + 14, 70, 20), $"{_replay.Playhead:0.0}/{_replay.Length:0.0}s", Styles.Hud);
-            if (GUI.Button(new Rect(r.xMax - 64, r.y + 10, 56, 26), "Live", Styles.Btn)) { _replay.Stop(); _replay.Playhead = 0f; }
+            if (GUI.Button(new Rect(r.xMax - 64, r.y + 10, 56, 26), "Live", Styles.BtnS)) { _replay.Stop(); _replay.Playhead = 0f; }
         }
 
         // ----- menu window with sidebar rail -----
@@ -422,27 +448,29 @@ namespace GorillaCaster
         private void DrawWindow(int id)
         {
             float W = _winRect.width, H = _winRect.height;
-            Styles.Fill(new Rect(0, 0, W, H), Styles.BgCol);
+            Styles.DrawCard(new Rect(0, 0, W, H), Styles.BgCol, 0f);
 
             // title bar
-            Styles.Fill(new Rect(0, 0, W, 30), new Color(0.04f, 0.05f, 0.06f, 1f));
-            GUI.Label(new Rect(14, 6, 300, 20), "GORILLA<color=#5cc8ff>CASTER</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
-            if (GUI.Button(new Rect(W - 30, 4, 24, 22), "✕", Styles.Btn)) _menuOpen = false;
-            Styles.Fill(new Rect(0, 30, W, 2), Styles.Accent);
+            Styles.Round(new Rect(0, 0, W, 34), new Color(0.035f, 0.04f, 0.052f, 1f), 14f);
+            Styles.Round(new Rect(14, 12, 9, 9), Styles.Accent, 4.5f);
+            GUI.Label(new Rect(30, 8, 320, 22), "Spooder's <color=#46c8ff>Camera Mod</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
+            if (GUI.Button(new Rect(W - 32, 7, 24, 22), "✕", Styles.BtnS)) _menuOpen = false;
 
             // sidebar rail
-            float railW = 130, top = 38;
-            Styles.Fill(new Rect(0, 32, railW, H - 32), Styles.RailCol);
+            float railW = 132, top = 44;
+            Styles.Round(new Rect(8, top, railW - 12, H - top - 10), Styles.RailCol, 12f);
             for (int i = 0; i < TabNames.Length; i++)
             {
-                var br = new Rect(6, top + i * 38, railW - 12, 32);
+                var br = new Rect(12, top + 6 + i * 38, railW - 20, 32);
                 bool on = _tab == i;
-                if (GUI.Button(br, TabNames[i], on ? Styles.RailBtnOn : Styles.RailBtn)) { _tab = i; _contentScroll = Vector2.zero; }
-                if (on) Styles.Fill(new Rect(0, br.y, 3, br.height), Styles.Accent);
+                if (GUI.Button(br, "  " + TabNames[i], on ? Styles.RailOnS : Styles.RailS)) { _tab = i; _contentScroll = Vector2.zero; }
+                if (on) Styles.Round(new Rect(br.x - 4, br.y + 6, 3, br.height - 12), Styles.Accent, 1.5f);
             }
 
-            // content
-            var content = new Rect(railW + 12, top, W - railW - 24, H - top - 12);
+            // content card
+            var card = new Rect(railW + 6, top, W - railW - 16, H - top - 10);
+            Styles.DrawCard(card, Styles.CardCol, 0f);
+            var content = new Rect(card.x + 12, card.y + 8, card.width - 22, card.height - 16);
             GUILayout.BeginArea(content);
             _contentScroll = GUILayout.BeginScrollView(_contentScroll);
             switch (_tab)
@@ -464,7 +492,7 @@ namespace GorillaCaster
         private void CameraTab()
         {
             UI.Header("Mode  ·  P to cycle");
-            int m = GUILayout.SelectionGrid((int)_mode, ModeNames, 3, Styles.Btn, GUILayout.Height(60));
+            int m = GUILayout.SelectionGrid((int)_mode, ModeNames, 3, Styles.BtnS, GUILayout.Height(58));
             if (m != (int)_mode) SetMode((CamMode)m);
 
             UI.Header("Lens");
@@ -514,23 +542,28 @@ namespace GorillaCaster
 
         private void GoProTab()
         {
-            UI.Header("Grabbable GoPro");
-            UI.Note("A physical GoPro you can grab with grip and place anywhere. Drop it for a static shot, or hold it for a moving one. Switch the camera to GoPro mode to broadcast its view.");
+            UI.Header("LIV Camera");
+            UI.Note("A sleek handheld camera with a live viewfinder screen. Grab it with GRIP and place it anywhere — hold it for moving shots, drop it for static ones.");
+
+            GUILayout.Space(2);
+            GUILayout.Label(_goPro.Spawned ? (_goPro.Held ? "Status:  <color=#5cf08a>● held</color>" : "Status:  <color=#46c8ff>● placed</color>") : "Status:  not spawned", Styles.Hud);
 
             GUILayout.Space(4);
-            GUILayout.Label(_goPro.Spawned ? (_goPro.Held ? "Status:  <color=#5cf08a>held</color>" : "Status:  <color=#5cc8ff>placed</color>") : "Status:  not spawned", Styles.Hud);
-
-            GUILayout.Space(6);
             GUILayout.BeginHorizontal();
-            if (UI.SmallButton(_goPro.Spawned ? "Summon to hand" : "Spawn", 150)) _goPro.SummonToHand();
+            if (UI.SmallButton(_goPro.Spawned ? "Summon to hand" : "Spawn", 148)) _goPro.SummonToHand();
             if (UI.SmallButton("Despawn", 110)) _goPro.Despawn();
             GUILayout.EndHorizontal();
+            if (UI.Primary(_mode == CamMode.GoPro ? "● Broadcasting Camera" : "Broadcast this camera")) SetMode(CamMode.GoPro);
 
-            GUILayout.Space(4);
-            if (UI.Button(_mode == CamMode.GoPro ? "● Broadcasting GoPro" : "Use GoPro as camera")) SetMode(CamMode.GoPro);
+            UI.Header("Camera Options");
+            _goPro.Viewfinder = UI.Toggle("Live viewfinder screen", _goPro.Viewfinder);
+            _goProAutoLevel = UI.Toggle("Auto-level horizon", _goProAutoLevel);
+            _goProStabilize = UI.Slider("Stabilization", _goProStabilize, 0f, 0.92f);
+            _fov = UI.Slider("Camera FOV", _fov, 10f, 120f, "0");
+            UI.Note("Stabilization smooths shaky hand movement. Auto-level keeps the horizon flat. FOV also drives the viewfinder.");
 
             UI.Header("How to grab");
-            UI.Note("Reach a hand to the GoPro and squeeze GRIP to pick it up. Release grip to drop it — it stays floating exactly where you let go.");
+            UI.Note("Reach a hand to the camera and squeeze GRIP to pick it up. Release to drop it — it floats exactly where you let go.");
         }
 
         private void PlayersTab()
@@ -544,7 +577,7 @@ namespace GorillaCaster
                 GUILayout.BeginHorizontal();
                 Styles.Fill(GUILayoutUtility.GetRect(10, 22, GUILayout.Width(10)), r.playerColor);
                 string tag = CasterUtil.IsTagged(r) ? "  <color=#ff5577>[IT]</color>" : "";
-                var st = new GUIStyle(Styles.Btn); if (sel) st.normal.textColor = new Color(0.36f, 0.94f, 0.54f);
+                var st = new GUIStyle(Styles.BtnS); if (sel) st.normal.textColor = new Color(0.36f, 0.94f, 0.54f);
                 if (GUILayout.Button($"[{(i + 1) % 10}] {CasterUtil.NameOf(r)}{tag}" + (sel ? "  ◄" : ""), st, GUILayout.Height(26)))
                     SelectIndex(i);
                 GUILayout.EndHorizontal();
@@ -632,6 +665,12 @@ namespace GorillaCaster
             _minimap = UI.Toggle("Overhead minimap", _minimap);
             _hud = UI.Toggle("FPS / mode / speed readout", _hud);
             _letterbox = UI.Toggle("Cinematic letterbox bars", _letterbox);
+            _nametagScale = UI.Slider("Nametag size", _nametagScale, 0.6f, 1.8f);
+
+            UI.Header("Watermark");
+            _watermark = UI.Toggle("Show watermark", _watermark);
+            _watermarkText = GUILayout.TextField(_watermarkText, 40, GUILayout.Height(26));
+            _watermarkOpacity = UI.Slider("Opacity", _watermarkOpacity, 0f, 1f);
 
             UI.Header("Movement Smoothing");
             _moveSmoothing = UI.Slider("Position", _moveSmoothing, 0f, 0.95f);

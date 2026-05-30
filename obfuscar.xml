@@ -1,0 +1,28 @@
+<?xml version='1.0'?>
+<Obfuscator>
+  <Var name="InPath" value="bin\Release" />
+  <Var name="OutPath" value="bin\Obf" />
+  <Var name="KeepPublicApi" value="false" />
+  <Var name="HidePrivateApi" value="true" />
+  <Var name="RenameProperties" value="true" />
+  <Var name="RenameFields" value="true" />
+  <Var name="RenameEvents" value="true" />
+  <Var name="UseUnicodeNames" value="false" />
+  <Var name="HideStrings" value="false" />
+  <Var name="OptimizeMethods" value="true" />
+
+  <!-- resolve the game + BepInEx assemblies our DLL references -->
+  <AssemblySearchPath path="D:\Steam\steamapps\common\Gorilla Tag\Gorilla Tag_Data\Managed" />
+  <AssemblySearchPath path="D:\Steam\steamapps\common\Gorilla Tag\BepInEx\core" />
+
+  <Module file="bin\Release\GorillaCaster.dll">
+    <!-- Unity invokes these by name via reflection — never rename them -->
+    <SkipMethod type="GorillaCaster.CasterController" name="Awake" />
+    <SkipMethod type="GorillaCaster.CasterController" name="Start" />
+    <SkipMethod type="GorillaCaster.CasterController" name="Update" />
+    <SkipMethod type="GorillaCaster.CasterController" name="LateUpdate" />
+    <SkipMethod type="GorillaCaster.CasterController" name="OnGUI" />
+    <SkipMethod type="GorillaCaster.CasterController" name="OnDestroy" />
+    <SkipMethod type="GorillaCaster.Plugin" name="Awake" />
+  </Module>
+</Obfuscator>

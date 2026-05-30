@@ -12,9 +12,11 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
   - **FreeCam** – fly anywhere: `WASD` move, `Space`/`Ctrl` up-down, `Shift` ×3 speed,
     `Alt` slow, hold **right-mouse** to look, scroll to zoom.
   - **First Person** – snaps to the cast player's head.
-  - **GoPro** – a **real grabbable GoPro prop** (with a model): reach out and squeeze **grip**
-    to pick it up, release to drop it in mid-air (sticky placement). GoPro mode broadcasts
-    from its lens — hold it for moving shots or plant it for static ones.
+  - **GoPro / LIV Camera** – a **real grabbable LIV-style camera** with a sleek model and a
+    **live viewfinder screen** showing what the lens sees. Reach out and squeeze **grip** to
+    pick it up, release to drop it in mid-air (sticky placement). On-camera options: live
+    viewfinder, **stabilization**, **auto-level horizon**, and FOV. GoPro mode broadcasts from
+    its lens — hold it for moving shots or plant it for static ones.
   - **Tripod** – plant a static camera anywhere; it stays put and auto-tracks the cast player.
   - **Selfie** – sits in front of the player's face looking back.
 - **Clean First-Person** – first-person mode bumps the *casting* camera's near-clip so your own
@@ -26,12 +28,14 @@ VR), so your headset view is never touched. Point OBS at the game window and cas
   (`L`) for a smooth Catmull-Rom camera move. Adjustable speed, optional loop.
 - **Player switching** – `1`–`0` to jump to a player, `N`/`B` to cycle, or click in the
   Players tab. **Auto-cast** automatically follows whoever is "IT".
-- **Stream overlays**:
+- **Stream overlays** (premium rounded theme):
   - Lower-third **NOW CASTING** bar with the player's color + IT status.
-  - **Floating nametags** above every player (color-coded, IT-flagged, optional **speed**).
+  - **Reworked floating nametags** — rounded, distance-scaled, color dot, IT chip, optional
+    **speed**, glowing accent on the cast target. Adjustable size.
   - **Overhead minimap** with live player dots.
   - Player list + FPS / mode / **speed (m/s)** readout.
   - **Cinematic letterbox** bars for a film look.
+  - A configurable **watermark** ("Spooder's Camera Mod") with an opacity slider.
   - **`F8` hides every overlay** instantly for clean capture.
 - **Camera controls** – FOV slider + presets, near-clip, follow distance/height,
   position & rotation smoothing.
@@ -68,6 +72,20 @@ dotnet build -c Release
 The build copies `GorillaCaster.dll` into `<GameDir>\BepInEx\plugins\GorillaCaster\`.
 Launch the game and press **Right Ctrl**.
 
+### Obfuscated release build
+
+`pack.ps1` builds, runs **Obfuscar** (`obfuscar.xml`), and deploys the obfuscated DLL.
+Unity message methods (`Awake`/`Start`/`Update`/`LateUpdate`/`OnGUI`) are excluded from
+renaming so the mod keeps working.
+
+```
+dotnet tool install --global Obfuscar.GlobalTool
+./pack.ps1
+```
+
+Verified against the live game (Unity 6 / BepInEx 5): the obfuscated plugin loads with no
+runtime errors.
+
 ## Requirements
 
 - Gorilla Tag (Steam, PC) with **BepInEx 5** installed.
@@ -80,12 +98,14 @@ Launch the game and press **Right Ctrl**.
 |------|---------|
 | `src/Plugin.cs` | BepInEx entry point + config |
 | `src/CasterController.cs` | Main loop: camera, input, menu, overlays |
-| `src/GoProProp.cs` | Procedural grabbable GoPro model + VR grab logic |
+| `src/GoProProp.cs` | Grabbable LIV-style camera: model, viewfinder, VR grab |
 | `src/DollyPath.cs` | Keyframed Catmull-Rom director path |
 | `src/ReplayRecorder.cs` | Instant-replay buffer + playback |
-| `src/HudExtras.cs` | Nametags, minimap, velocity, shared rig helpers |
-| `src/Styles.cs` | IMGUI dark theme / textures |
-| `src/UI.cs` | Themed widgets (sliders, toggles, buttons) |
+| `src/HudExtras.cs` | Nametags, minimap, watermark, velocity, helpers |
+| `src/Styles.cs` | Premium IMGUI theme |
+| `src/TextureGen.cs` | Runtime rounded-rect / shadow textures |
+| `src/UI.cs` | Themed widgets (sliders, switches, buttons) |
+| `obfuscar.xml`, `pack.ps1` | Obfuscation config + release packaging |
 
 > Use it for content creation / casting in private & modded lobbies, per Gorilla Tag's
 > modding policy. Don't use mods in public matchmaking.
