@@ -25,6 +25,9 @@ namespace GorillaCaster
         // styles
         public static GUIStyle Brand, Title, Header, Label, Value, Sub, Hud, BtnS, BtnPrimaryS, RailS, RailOnS, SliderS, ThumbS, PillS, Tag, TagShadow, LowerThirdName, LowerThirdSub, Note, Water;
 
+        // reusable scratch styles (mutate fontSize/color before use — avoids per-frame GC)
+        public static GUIStyle ScratchTag, ScratchTagShadow, ScratchLabel, ScratchHud;
+
         public static void Ensure()
         {
             if (_built) return;
@@ -83,6 +86,11 @@ namespace GorillaCaster
             TagShadow = new GUIStyle(Tag); TagShadow.normal.textColor = new Color(0, 0, 0, 0.85f);
             LowerThirdName = Mk(22, FontStyle.Bold, Color.white);
             LowerThirdSub = Mk(13, FontStyle.Bold, new Color(0.8f, 0.85f, 0.9f));
+
+            ScratchTag = new GUIStyle(Tag) { alignment = TextAnchor.MiddleLeft };
+            ScratchTagShadow = new GUIStyle(TagShadow) { alignment = TextAnchor.MiddleLeft };
+            ScratchLabel = new GUIStyle(Hud) { fontSize = 12 };
+            ScratchHud = new GUIStyle(Hud);
         }
 
         private static GUIStyle Btn9(Texture2D n, Texture2D h, Texture2D a, Color text)

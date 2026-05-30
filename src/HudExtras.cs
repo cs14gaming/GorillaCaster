@@ -34,6 +34,13 @@ namespace GorillaCaster
             try { return r.LatestVelocity().magnitude; }
             catch { return 0f; }
         }
+
+        public static Vector3 Velocity(VRRig r)
+        {
+            if (r == null) return Vector3.zero;
+            try { return r.LatestVelocity(); }
+            catch { return Vector3.zero; }
+        }
     }
 
     /// <summary>Premium floating nametags, overhead minimap, and the mod watermark.</summary>
@@ -60,7 +67,8 @@ namespace GorillaCaster
 
                 string name = CasterUtil.NameOf(r);
                 int fs = Mathf.Max(9, Mathf.RoundToInt(13 * s));
-                var nameStyle = new GUIStyle(Styles.Tag) { fontSize = fs, alignment = TextAnchor.MiddleLeft };
+                var nameStyle = Styles.ScratchTag;        // reused, no per-frame alloc
+                nameStyle.fontSize = fs; nameStyle.normal.textColor = Color.white;
                 Vector2 nsz = nameStyle.CalcSize(new GUIContent(name));
 
                 float pad = 9f * s, dot = 9f * s, gap = 6f * s;
@@ -68,7 +76,8 @@ namespace GorillaCaster
                 float w = pad + dot + gap + nsz.x + pad;
 
                 string spd = showVelocity ? $"{CasterUtil.Speed(r):0.0}" : null;
-                var spdStyle = new GUIStyle(nameStyle) { fontSize = Mathf.Max(8, fs - 2) };
+                var spdStyle = Styles.ScratchTagShadow;   // reused
+                spdStyle.fontSize = Mathf.Max(8, fs - 2);
                 spdStyle.normal.textColor = Styles.Accent;
                 float spdW = 0f;
                 if (spd != null) { spdW = spdStyle.CalcSize(new GUIContent(spd)).x + gap; w += spdW; }
@@ -102,7 +111,9 @@ namespace GorillaCaster
                 {
                     var chip = new Rect(rect.xMax - 22f * s - pad, rect.y + (h - 14f * s) / 2f, 22f * s, 14f * s);
                     Styles.Round(chip, Styles.Accent2, 6f * s);
-                    GUI.Label(chip, "IT", new GUIStyle(Styles.Tag) { fontSize = Mathf.Max(8, fs - 3), alignment = TextAnchor.MiddleCenter });
+                    var chipStyle = Styles.ScratchLabel;
+                    chipStyle.alignment = TextAnchor.MiddleCenter; chipStyle.fontSize = Mathf.Max(8, fs - 3); chipStyle.normal.textColor = Color.white;
+                    GUI.Label(chip, "IT", chipStyle);
                 }
             }
         }

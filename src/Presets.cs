@@ -10,7 +10,7 @@ namespace GorillaCaster
     public class CamPreset
     {
         public string name = "Preset";
-        public float fov = 90f, nearClip = 0.05f, followDist = 1.4f, followHeight = 0.25f, moveSmooth = 0.45f, rotSmooth = 0.45f;
+        public float fov = 90f, nearClip = 0.05f, followDist = 1.4f, followHeight = 0.25f, followLead = 0f, moveSmooth = 0.45f, rotSmooth = 0.45f;
         public int mode = 0, filter = 0, aspect = 0;
         public float vignette = 0f, filterStrength = 0.8f;
         public bool nametags = true, lowerThird = true, minimap = false, letterbox = false, thirds = false;

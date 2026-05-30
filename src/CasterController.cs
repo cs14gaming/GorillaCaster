@@ -37,6 +37,7 @@ namespace GorillaCaster
         private bool _fpHideSelf = true;
         private float _followDistance = 1.4f;
         private float _followHeight = 0.25f;
+        private float _followLead = 0f;
         private float _moveSmoothing = 0.45f;
         private float _rotSmoothing = 0.45f;
         private float _freeSpeed = 6f;
@@ -258,8 +259,10 @@ namespace GorillaCaster
                     behind.y = 0f;
                     if (behind.sqrMagnitude < 0.001f) behind = -head.forward;
                     behind.Normalize();
-                    desiredPos = head.position + behind * _followDistance + Vector3.up * _followHeight;
-                    desiredRot = Quaternion.LookRotation((head.position + Vector3.up * 0.05f) - desiredPos, Vector3.up);
+                    Vector3 lead = Vector3.ClampMagnitude(CasterUtil.Velocity(_target), 9f) * (_followLead * 0.10f);
+                    Vector3 lookAt = head.position + Vector3.up * 0.05f + lead;
+                    desiredPos = head.position + behind * _followDistance + Vector3.up * _followHeight - lead * 0.25f;
+                    desiredRot = Quaternion.LookRotation(lookAt - desiredPos, Vector3.up);
                     break;
             }
 
@@ -391,7 +394,7 @@ namespace GorillaCaster
         {
             if (p == null) return;
             _fov = p.fov; _nearClip = p.nearClip;
-            _followDistance = p.followDist; _followHeight = p.followHeight;
+            _followDistance = p.followDist; _followHeight = p.followHeight; _followLead = p.followLead;
             _moveSmoothing = p.moveSmooth; _rotSmoothing = p.rotSmooth;
             SetMode((CamMode)Mathf.Clamp(p.mode, 0, ModeNames.Length - 1));
             _filter = p.filter; _filterStrength = p.filterStrength; _vignette = p.vignette; _aspect = p.aspect; _thirds = p.thirds;
@@ -400,7 +403,7 @@ namespace GorillaCaster
 
         private CamPreset Capture(string name) => new CamPreset
         {
-            name = name, fov = _fov, nearClip = _nearClip, followDist = _followDistance, followHeight = _followHeight,
+            name = name, fov = _fov, nearClip = _nearClip, followDist = _followDistance, followHeight = _followHeight, followLead = _followLead,
             moveSmooth = _moveSmoothing, rotSmooth = _rotSmoothing, mode = (int)_mode,
             filter = _filter, filterStrength = _filterStrength, vignette = _vignette, aspect = _aspect, thirds = _thirds,
             nametags = _nametags, lowerThird = _lowerThird, minimap = _minimap, letterbox = _letterbox
@@ -680,6 +683,7 @@ namespace GorillaCaster
                 UI.Header("Follow");
                 _followDistance = UI.Slider("Distance", _followDistance, 0f, 4f);
                 _followHeight = UI.Slider("Height", _followHeight, -1f, 1.5f);
+                _followLead = UI.Slider("Lead (anticipate motion)", _followLead, 0f, 1f);
                 _orbit = UI.Toggle("Auto-orbit  (Q/E manual)", _orbit);
                 if (_orbit) _orbitSpeed = UI.Slider("Orbit Speed", _orbitSpeed, -120f, 120f, "0");
             }
