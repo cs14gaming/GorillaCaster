@@ -36,6 +36,8 @@ namespace GorillaCaster
         private readonly List<Btn> _btns = new List<Btn>();
         private int _hand;
         private Vector3 _localPos;
+        private Quaternion _localRot;
+        private Vector2 _smoothLp;
         private bool _trigPrev;
         private int _hoverIdx = -1, _lastHoverSound = -1;
         private const float GrabRadius = 0.42f;
@@ -212,7 +214,7 @@ namespace GorillaCaster
                     Transform hand = _hand == 0 ? rh : lh;
                     bool grabbing = _hand == 0 ? poller.rightGrab : poller.leftGrab;
                     if (!grabbing || hand == null) Held = false;
-                    else Root.transform.position = hand.TransformPoint(_localPos);
+                    else Root.transform.SetPositionAndRotation(hand.TransformPoint(_localPos), hand.rotation * _localRot); // full 6DOF, no flip
                     holding = _hand;
                 }
 
@@ -224,13 +226,6 @@ namespace GorillaCaster
                 if (_cursor != null && _cursor.gameObject.activeSelf != ray) _cursor.gameObject.SetActive(ray);
             }
 
-            if (Held)
-            {
-                Vector3 head = HeadPos();
-                if (head != Vector3.zero)
-                    Root.transform.rotation = Quaternion.Slerp(Root.transform.rotation,
-                        Quaternion.LookRotation(Root.transform.position - head, Vector3.up), 0.4f);
-            }
             Animate();
         }
 
@@ -258,6 +253,7 @@ namespace GorillaCaster
 
             if (hit)
             {
+                _smoothLp = Vector2.Lerp(_smoothLp, lp2, 0.55f); lp2 = _smoothLp;   // de-jitter the pointer
                 if (_cursor != null) SetRect(_cursor.rectTransform, lp2.x, lp2.y, 26, 26);
                 int hovered = -1;
                 for (int i = 0; i < _btns.Count; i++)
@@ -308,7 +304,12 @@ namespace GorillaCaster
         }
 
         private bool Near(Transform hand) => Vector3.Distance(hand.position, Root.transform.position) < GrabRadius;
-        private void Attach(int hand, Transform t) { Held = true; _hand = hand; _localPos = t.InverseTransformPoint(Root.transform.position); }
+        private void Attach(int hand, Transform t)
+        {
+            Held = true; _hand = hand;
+            _localPos = t.InverseTransformPoint(Root.transform.position);
+            _localRot = Quaternion.Inverse(t.rotation) * Root.transform.rotation;   // keep current orientation (no flip on grab)
+        }
 
         private static Vector3 HeadPos() { var t = HeadTransform(); return t != null ? t.position : Vector3.zero; }
         private static Transform HeadTransform() { var t = GorillaTagger.Instance; if (t != null && t.mainCamera != null) return t.mainCamera.transform; return Camera.main != null ? Camera.main.transform : null; }
