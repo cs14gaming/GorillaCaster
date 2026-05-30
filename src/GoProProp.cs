@@ -94,7 +94,7 @@ namespace GorillaCaster
             _canvas = (RectTransform)go.transform;
             _canvas.sizeDelta = new Vector2(CW, CH);
             _canvas.localPosition = new Vector3(0, 0, 0.0075f);
-            _canvas.localScale = Vector3.one * S;
+            _canvas.localScale = new Vector3(-S, S, S);   // negative X un-mirrors the UI (faces head)
 
             MkImage(_canvas, "bg", Round(), new Color(0.10f, 0.11f, 0.14f, 1f), 0, 0, CW, CH);
             _accentBar = MkImage(_canvas, "accent", Round(), Styles.Accent, 0, CH / 2f - 6, CW - 26, 4);
@@ -345,7 +345,7 @@ namespace GorillaCaster
         private void Animate()
         {
             // pop-in
-            if (_popT < 1f) { _popT = Mathf.Min(1f, _popT + Time.deltaTime * 5f); float s = Mathf.SmoothStep(0.7f, 1f, _popT); if (_rootGroup != null) _rootGroup.alpha = _popT; if (_canvas != null) _canvas.localScale = Vector3.one * S * s; }
+            if (_popT < 1f) { _popT = Mathf.Min(1f, _popT + Time.deltaTime * 5f); float s = Mathf.SmoothStep(0.7f, 1f, _popT); if (_rootGroup != null) _rootGroup.alpha = _popT; if (_canvas != null) _canvas.localScale = new Vector3(-S, S, S) * s; }
 
             // page fades
             for (int i = 0; i < _pages.Count; i++)
