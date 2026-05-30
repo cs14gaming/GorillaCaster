@@ -1,8 +1,8 @@
 {
   "name": "GorillaCaster",
-  "version_number": "1.10.0",
+  "version_number": "1.11.0",
   "website_url": "",
-  "description": "Spooder's Camera Mod — the most complete Gorilla Tag casting mod: a smooth in-VR control tablet with live viewfinder, competitive round timer + scoreboard, color-grade filters, aspect framing guides, camera presets, auto-director, instant replay, dolly paths, 6 camera modes, reworked nametags, minimap, and a premium overlay HUD.",
+  "description": "Spooder's Camera Mod — the most complete Gorilla Tag casting mod: a smooth in-VR control tablet with live viewfinder, competitive round timer + scoreboard, color-grade filters, aspect framing guides, camera presets, auto-director, cinematic dolly paths, 6 camera modes (incl. Pokruk-style first person), camera collision, reworked occluded nametags, minimap, and a premium overlay HUD.",
   "dependencies": [
     "BepInEx-BepInExPack-5.4.2100"
   ]

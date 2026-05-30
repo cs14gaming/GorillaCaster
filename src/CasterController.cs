@@ -22,7 +22,7 @@ namespace GorillaCaster
         private static readonly string[] ModeNames =
             { "Follow", "FreeCam", "First Person", "Tablet", "Tripod", "Selfie" };
         private static readonly string[] TabNames =
-            { "Camera", "Tablet", "Players", "Comp", "Replay", "Director", "Look", "World", "Overlays", "Presets" };
+            { "Camera", "Tablet", "Players", "Comp", "Help", "Director", "Look", "World", "Overlays", "Presets" };
 
         // ---- camera ----
         private Camera _cam;
@@ -67,7 +67,6 @@ namespace GorillaCaster
 
         // modules
         private readonly DollyPath _dolly = new DollyPath();
-        private readonly ReplayRecorder _replay = new ReplayRecorder();
         private readonly GoProProp _goPro = new GoProProp();
         private readonly CompHud _comp = new CompHud();
 
@@ -84,10 +83,6 @@ namespace GorillaCaster
         // auto-director
         private bool _autoDirector;
 
-        // killcam / help / framing
-        private bool _killcam;
-        private int _kcPrev = -1;
-        private float _kcCooldown, _kcSeconds = 5f, _kcSpeed = 0.5f;
         private bool _cheatsheet, _crosshair;
 
         // toggles
@@ -143,7 +138,6 @@ namespace GorillaCaster
         {
             try
             {
-                if (_replay.Playing) _replay.ApplyPlayback(Time.deltaTime);
                 DriveCamera();
             }
             catch (Exception e) { Debug.LogWarning("[GorillaCaster] LateUpdate: " + e.Message); }
@@ -186,8 +180,6 @@ namespace GorillaCaster
             if (Pressed(Key.K)) _dolly.Add(_cam.transform);
             if (Pressed(Key.L)) { if (_dolly.Playing) _dolly.Stop(); else _dolly.Play(); }
             if (Pressed(Key.F8)) _hudHidden = !_hudHidden;
-            if (Pressed(Key.F6)) ToggleRecording();
-            if (Pressed(Key.F7)) ToggleReplay();
             HandleNumberKeys(kb);
 
             if (_brain != null && _brain.enabled) _brain.enabled = false;
@@ -198,13 +190,11 @@ namespace GorillaCaster
             if (Pressed(Key.RightBracket)) CyclePreset(1);
 
             RefreshRigs();
-            _replay.Sample(_rigs, Time.deltaTime);
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             HudExtras.NametagScale = _nametagScale;
             HudExtras.Occlude = _nametagOcclude;
             if (Pressed(Key.F1)) _cheatsheet = !_cheatsheet;
-            UpdateKillcam();
 
             if (_autoDirector) AutoDirect();
             else if (_autoCast) AutoPickTarget();
@@ -390,22 +380,6 @@ namespace GorillaCaster
             else if (anyInfected != null) _target = anyInfected;
         }
 
-        // Auto-replay the moment someone gets tagged, in slow-mo.
-        private void UpdateKillcam()
-        {
-            if (!_killcam) { _kcPrev = -1; return; }
-            if (!_replay.Recording) _replay.StartRecording();
-            int tagged = 0;
-            for (int i = 0; i < _rigs.Count; i++) if (CasterUtil.IsTagged(_rigs[i])) tagged++;
-            if (_kcPrev >= 0 && tagged > _kcPrev && !_replay.Playing && Time.time > _kcCooldown && _replay.Length > 2f)
-            {
-                _replay.Speed = _kcSpeed;
-                _replay.Play(Mathf.Max(0f, _replay.Length - _kcSeconds));
-                _kcCooldown = Time.time + 7f;
-            }
-            _kcPrev = tagged;
-        }
-
         // ----- presets -----
         private void CyclePreset(int dir)
         {
@@ -460,8 +434,8 @@ namespace GorillaCaster
         // Wire the in-VR phone's on-screen buttons to mod actions.
         private void WirePhone()
         {
-            _goPro.OnRecord = ToggleRecording;
-            _goPro.OnPlay = ToggleReplay;
+            _goPro.OnNext = () => CycleTarget(1);
+            _goPro.OnPrev = () => CycleTarget(-1);
             _goPro.OnCycleMode = CycleMode;
             _goPro.OnToggleView = () => _goPro.Viewfinder = !_goPro.Viewfinder;
             _goPro.OnFovUp = () => _fov = Mathf.Clamp(_fov + 5f, 10f, 120f);
@@ -470,12 +444,9 @@ namespace GorillaCaster
             _goPro.OnHide = () => _hudHidden = !_hudHidden;
             _goPro.OnDirector = () => _autoDirector = !_autoDirector;
             _goPro.OnShot = Screenshot;
-            _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°" + (_replay.Recording ? "   REC" : "");
-            _goPro.IsRecording = () => _replay.Recording;
+            _goPro.StatusText = () => $"{ModeNames[(int)_mode]}   {(int)_fov}°";
         }
 
-        private void ToggleRecording() { if (_replay.Recording) _replay.StopRecording(); else _replay.StartRecording(); }
-        private void ToggleReplay() { if (_replay.Playing) _replay.Stop(); else _replay.Play(0f); }
 
         private void Screenshot()
         {
@@ -527,8 +498,6 @@ namespace GorillaCaster
                     _comp.Draw(_rigs);
                     if (_lowerThird && _target != null) DrawLowerThird();
                     if (_crosshair) DrawCrosshair();
-                    if (_replay.Recording) DrawRecIndicator();
-                    if (_replay.Playing || _replay.Length > 0.01f) DrawReplayBar();
                 }
                 if (_cheatsheet) DrawCheatsheet();
                 if (_menuOpen) _winRect = GUI.Window(0xCA57, _winRect, DrawWindow, "");
@@ -598,7 +567,6 @@ namespace GorillaCaster
             new[]{ "1-0 / N / B", "Cast player / cycle" },
             new[]{ "Q / E", "Orbit (Follow)" },
             new[]{ "K / L", "Dolly keyframe / play" },
-            new[]{ "F6 / F7", "Replay record / play" },
             new[]{ "[ / ]", "Previous / next preset" },
             new[]{ "F8", "Hide all overlays" },
             new[]{ "F1", "This cheatsheet" },
@@ -619,26 +587,6 @@ namespace GorillaCaster
                 GUI.Label(new Rect(r.x + 128, y, w - 138, 18), row[1], new GUIStyle(Styles.Sub) { fontSize = 12 });
                 y += 22;
             }
-        }
-
-        private void DrawRecIndicator()
-        {
-            GUI.Label(new Rect(Screen.width - 120, 12, 110, 22), $"<color=#ff4040>● REC</color> {_replay.Length:0}s",
-                new GUIStyle(Styles.Hud) { fontSize = 14 });
-        }
-
-        private void DrawReplayBar()
-        {
-            float w = 560, h = 46;
-            var r = new Rect((Screen.width - w) / 2f, Screen.height - h - 6, w, h);
-            Styles.Fill(r, new Color(0.05f, 0.06f, 0.08f, 0.9f));
-            Styles.Fill(new Rect(r.x, r.y, w, 2f), Styles.Accent);
-            if (GUI.Button(new Rect(r.x + 8, r.y + 10, 60, 26), _replay.Playing ? "Pause" : "Play", Styles.BtnS))
-                { if (_replay.Playing) _replay.Stop(); else _replay.Play(_replay.Playhead >= _replay.Length ? 0f : _replay.Playhead); }
-            float v = GUI.HorizontalSlider(new Rect(r.x + 78, r.y + 22, w - 230, 12), _replay.Playhead, 0f, Mathf.Max(0.01f, _replay.Length), Styles.SliderS, Styles.ThumbS);
-            if (Mathf.Abs(v - _replay.Playhead) > 0.005f) { _replay.Stop(); _replay.Playhead = v; _replay.ApplyAt(v); }
-            GUI.Label(new Rect(r.xMax - 140, r.y + 14, 70, 20), $"{_replay.Playhead:0.0}/{_replay.Length:0.0}s", Styles.Hud);
-            if (GUI.Button(new Rect(r.xMax - 64, r.y + 10, 56, 26), "Live", Styles.BtnS)) { _replay.Stop(); _replay.Playhead = 0f; }
         }
 
         // ----- menu window with sidebar rail -----
@@ -677,7 +625,7 @@ namespace GorillaCaster
                 case 1: GoProTab(); break;
                 case 2: PlayersTab(); break;
                 case 3: CompTab(); break;
-                case 4: ReplayTab(); break;
+                case 4: HelpTab(); break;
                 case 5: DirectorTab(); break;
                 case 6: LookTab(); break;
                 case 7: WorldTab(); break;
@@ -817,41 +765,19 @@ namespace GorillaCaster
             GUILayout.EndScrollView();
         }
 
-        private void ReplayTab()
+        private void HelpTab()
         {
-            UI.Header("Instant Replay  ·  F6 / F7");
-            GUILayout.Label(_replay.Recording ? $"<color=#ff5577>● Recording</color> — {_replay.Length:0}s"
-                : (_replay.Length > 0.01f ? $"{_replay.Length:0}s buffered" : "Not recording."), Styles.Hud);
-            UI.Note("Buffers every player's motion, then replays it so you can re-show and slow-mo a moment while flying the camera freely.");
-
-            GUILayout.BeginHorizontal();
-            if (UI.SmallButton(_replay.Recording ? "Stop Rec" : "Record", 120)) ToggleRecording();
-            if (UI.SmallButton("Clear", 90)) _replay.Clear();
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (UI.SmallButton(_replay.Playing ? "Stop" : "Play", 120)) ToggleReplay();
-            if (UI.SmallButton("Restart", 90)) _replay.Play(0f);
-            GUILayout.EndHorizontal();
-
-            UI.Header("Speed");
-            _replay.Speed = UI.Slider("Playback", _replay.Speed, 0.1f, 2f);
-            GUILayout.BeginHorizontal();
-            if (UI.SmallButton("0.25x", 70)) _replay.Speed = 0.25f;
-            if (UI.SmallButton("0.5x", 70)) _replay.Speed = 0.5f;
-            if (UI.SmallButton("1x", 70)) _replay.Speed = 1f;
-            GUILayout.EndHorizontal();
-
-            _replay.BufferSeconds = UI.Slider("Buffer length (s)", _replay.BufferSeconds, 5f, 90f, "0");
-            UI.Note("During playback, drag the bar at the bottom of the screen to scrub.");
-
-            UI.Header("Killcam");
-            _killcam = UI.Toggle("Auto slow-mo replay on every tag", _killcam);
-            if (_killcam)
+            UI.Header("Hotkeys");
+            foreach (var row in CheatRows)
             {
-                _kcSeconds = UI.Slider("Clip length (s)", _kcSeconds, 2f, 12f, "0");
-                _kcSpeed = UI.Slider("Slow-mo speed", _kcSpeed, 0.1f, 1f);
-                UI.Note("Keeps recording and auto-replays the moment someone is tagged.");
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(row[0], new GUIStyle(Styles.Hud) { fontSize = 12 }, GUILayout.Width(96));
+                GUILayout.Label(row[1], Styles.Sub);
+                GUILayout.EndHorizontal();
             }
+            UI.Header("Tablet");
+            UI.Note("Spawn it in the Tablet tab. Hold with GRIP and poke the screen (or hover + trigger) to control everything in VR: NEXT/PREV cast · MODE · DIR · FOV± · VIEW · TIME · HUD · SHOT.");
+            UI.Note("Instant-replay recording was removed for stability.");
         }
 
         private void DirectorTab()

@@ -13,7 +13,7 @@ namespace GorillaCaster
     {
         public const string Guid = "com.forza.gorillacaster";
         public const string Name = "GorillaCaster";
-        public const string Version = "1.10.0";
+        public const string Version = "1.11.0";
 
         public static Plugin Instance { get; private set; }
 

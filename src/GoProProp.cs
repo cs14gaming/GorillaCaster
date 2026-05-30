@@ -19,16 +19,14 @@ namespace GorillaCaster
         public bool Spawned => Root != null;
         public bool Viewfinder = true;
 
-        public Action OnRecord, OnPlay, OnCycleMode, OnToggleView, OnFovUp, OnFovDown, OnTime, OnHide, OnDirector, OnShot;
+        public Action OnNext, OnPrev, OnCycleMode, OnToggleView, OnFovUp, OnFovDown, OnTime, OnHide, OnDirector, OnShot;
         public Func<string> StatusText;
-        public Func<bool> IsRecording;
 
         private Camera _preview;
         private RenderTexture _rt;
         private RawImage _vf;
         private Text _status;
         private RectTransform _canvas;
-        private Material _recMat;
         private readonly List<TBtn> _btns = new List<TBtn>();
         private int _hand;
         private Vector3 _localPos;
@@ -45,7 +43,6 @@ namespace GorillaCaster
             public Color col;
             public Image img;
             public float flash;
-            public int recIndex; // 0 = REC button (pulses while recording)
         }
 
         // ============================================================ model + canvas
@@ -56,20 +53,18 @@ namespace GorillaCaster
             Root = new GameObject("SpooderTablet") { hideFlags = HideFlags.DontSave };
 
             float w = CW * S, h = CH * S, t = 0.008f;
-            // body slab
-            Box(Root.transform, new Vector3(0, 0, 0.002f), new Vector3(w + 0.008f, h + 0.008f, t), new Color(0.07f, 0.075f, 0.09f));
+            // body slab (screen on +z toward holder, lens on -z)
+            Box(Root.transform, Vector3.zero, new Vector3(w + 0.008f, h + 0.008f, t), new Color(0.07f, 0.075f, 0.09f));
 
-            // rear lens (-z) + glow
+            // rear lens (-z) + glow — films away from the holder
             Box(Root.transform, new Vector3(w * 0.4f, h * 0.4f, -0.006f), new Vector3(0.022f, 0.022f, 0.01f), new Color(0.03f, 0.03f, 0.04f));
             var glass = Cyl(Root.transform, new Vector3(w * 0.4f, h * 0.4f, -0.012f), 0.008f, 0.002f, new Color(0.1f, 0.4f, 0.6f), true);
             glass.transform.localRotation = Quaternion.Euler(90, 0, 0);
-            var rec = Box(Root.transform, new Vector3(-w * 0.42f, h * 0.42f, -0.006f), new Vector3(0.008f, 0.004f, 0.004f), new Color(1f, 0.15f, 0.15f), true);
-            _recMat = rec.GetComponent<Renderer>() != null ? rec.GetComponent<Renderer>().material : null;
 
             var lensGo = new GameObject("Lens");
             lensGo.transform.SetParent(Root.transform, false);
             lensGo.transform.localPosition = new Vector3(w * 0.4f, h * 0.4f, -0.03f);
-            lensGo.transform.localRotation = Quaternion.Euler(0, 180, 0); // forward = -z (films away from holder)
+            lensGo.transform.localRotation = Quaternion.Euler(0, 180, 0); // forward = -z
             Lens = lensGo.transform;
 
             BuildCanvas();
@@ -85,9 +80,8 @@ namespace GorillaCaster
             canvas.renderMode = RenderMode.WorldSpace;
             _canvas = (RectTransform)go.transform;
             _canvas.sizeDelta = new Vector2(CW, CH);
-            _canvas.localPosition = new Vector3(0, 0, -0.0046f); // front (+? screen faces -z toward holder)
+            _canvas.localPosition = new Vector3(0, 0, 0.0075f); // screen on +z (faces holder, NOT mirrored)
             _canvas.localScale = Vector3.one * S;
-            _canvas.localRotation = Quaternion.Euler(0, 180, 0); // face the holder
 
             // background
             var bg = MkImage(_canvas, "bg", Round(), new Color(0.10f, 0.11f, 0.14f, 1f));
@@ -108,9 +102,9 @@ namespace GorillaCaster
             // control grid (right): 2 cols x 5 rows
             float colL = CW * 0.16f, colR = CW * 0.36f, bw = CW * 0.18f, bh = CH * 0.13f;
             float[] rows = { CH * 0.30f, CH * 0.15f, 0f, -CH * 0.15f, -CH * 0.30f };
-            AddBtn(colL, rows[0], bw, bh, "REC", new Color(0.85f, 0.22f, 0.28f), () => OnRecord?.Invoke(), 0);
+            AddBtn(colL, rows[0], bw, bh, "NEXT", new Color(0.20f, 0.45f, 0.5f), () => OnNext?.Invoke());
             AddBtn(colR, rows[0], bw, bh, "MODE", Panel(), () => OnCycleMode?.Invoke());
-            AddBtn(colL, rows[1], bw, bh, "PLAY", new Color(0.20f, 0.45f, 0.32f), () => OnPlay?.Invoke());
+            AddBtn(colL, rows[1], bw, bh, "PREV", new Color(0.20f, 0.45f, 0.5f), () => OnPrev?.Invoke());
             AddBtn(colR, rows[1], bw, bh, "DIR", new Color(0.32f, 0.27f, 0.55f), () => OnDirector?.Invoke());
             AddBtn(colL, rows[2], bw, bh, "FOV-", Panel(), () => OnFovDown?.Invoke());
             AddBtn(colR, rows[2], bw, bh, "FOV+", Panel(), () => OnFovUp?.Invoke());
@@ -120,13 +114,13 @@ namespace GorillaCaster
             AddBtn(colR, rows[4], bw, bh, "SHOT", Panel(), () => OnShot?.Invoke());
         }
 
-        private void AddBtn(float x, float y, float w, float h, string label, Color col, Action act, int recIndex = -1)
+        private void AddBtn(float x, float y, float w, float h, string label, Color col, Action act)
         {
             var img = MkImage(_canvas, "btn_" + label, Round(), col);
             SetRect(img.rectTransform, x, y, w, h);
             var txt = MkText(img.rectTransform, "t", label, 26, Color.white);
             SetRect(txt.rectTransform, 0, 0, w, h);
-            _btns.Add(new TBtn { c = new Vector2(x, y), half = new Vector2(w / 2f, h / 2f), act = act, col = col, img = img, recIndex = recIndex });
+            _btns.Add(new TBtn { c = new Vector2(x, y), half = new Vector2(w / 2f, h / 2f), act = act, col = col, img = img });
         }
 
         private void BuildViewfinder()
@@ -197,25 +191,15 @@ namespace GorillaCaster
                 if (lh != null && holding != 1) Touch(lh.position, true, poller.leftControllerTriggerButton);
             }
 
-            bool recOn = IsRecording != null && IsRecording();
             for (int i = 0; i < _btns.Count; i++)
             {
                 var b = _btns[i];
                 if (b.img == null) continue;
                 Color target = b.col;
-                if (b.recIndex == 0 && recOn) target = new Color(1f, 0.3f, 0.35f);
                 if (b.flash > 0f) { b.flash -= Time.deltaTime * 4f; target = Color.Lerp(target, Styles.Accent, Mathf.Clamp01(b.flash)); }
                 b.img.color = target;
             }
             if (_status != null && StatusText != null) _status.text = StatusText();
-
-            if (_recMat != null)
-            {
-                float p = recOn ? (0.4f + 0.6f * Mathf.PingPong(Time.time * 2.4f, 1f)) : 0.18f;
-                var c = new Color(1f, 0.15f, 0.15f) * p;
-                _recMat.color = c;
-                if (_recMat.HasProperty("_EmissionColor")) _recMat.SetColor("_EmissionColor", c);
-            }
         }
 
         private void Touch(Vector3 worldHand, bool isLeft, bool trigger)
