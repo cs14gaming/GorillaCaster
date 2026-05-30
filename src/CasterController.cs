@@ -87,6 +87,11 @@ namespace GorillaCaster
         private bool _aPrev;
         private Transform _camFollower;
 
+        // VR world-space nametags + rig lerp (caster controls)
+        private bool _vrNametags, _vrNametagVel;
+        private float _vrNametagSize = 1f;
+        private float _rigLerp = 1f;
+
         // toggles
         private bool _menuOpen;
         private bool _autoCast;
@@ -201,6 +206,9 @@ namespace GorillaCaster
             RefreshRigs();
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
+            VrNametags.Enabled = _vrNametags; VrNametags.ShowVelocity = _vrNametagVel; VrNametags.Size = _vrNametagSize;
+            VrNametags.Tick(_rigs);
+            ApplyRigLerp();
             HudExtras.NametagScale = _nametagScale;
             HudExtras.Occlude = _nametagOcclude;
             if (Pressed(Key.F1)) _cheatsheet = !_cheatsheet;
@@ -312,6 +320,21 @@ namespace GorillaCaster
         {
             var local = GorillaTagger.Instance != null ? GorillaTagger.Instance.offlineVRRig : null;
             return _target == local ? CamFollower() : null;
+        }
+
+        // Scale every remote rig's interpolation (smoother / sharper player animation for casting).
+        private void ApplyRigLerp()
+        {
+            if (Mathf.Abs(_rigLerp - 1f) < 0.01f) return;
+            var local = GorillaTagger.Instance != null ? GorillaTagger.Instance.offlineVRRig : null;
+            if (local == null) return;
+            float bb = local.lerpValueBody, bf = local.lerpValueFingers;
+            for (int i = 0; i < _rigs.Count; i++)
+            {
+                var r = _rigs[i];
+                if (r == null || r == local) continue;
+                try { r.lerpValueBody = bb * _rigLerp; r.lerpValueFingers = bf * _rigLerp; } catch { }
+            }
         }
 
         private static float SmoothK(float s)
@@ -465,6 +488,7 @@ namespace GorillaCaster
         {
             _goPro.OnCommand = HandleTabletCommand;
             _goPro.StatusText = () => $"{ModeNames[(int)_mode]}  {(int)_fov}°";
+            _goPro.ModReports = () => ModChecker.Scan(_rigs);
         }
 
         private void HandleTabletCommand(string cmd)
@@ -474,6 +498,9 @@ namespace GorillaCaster
                 case "mode": CycleMode(); break;
                 case "third": SetMode(CamMode.Follow); break;
                 case "free": SetMode(CamMode.FreeCam); break;
+                case "selfie": SetMode(CamMode.Selfie); break;
+                case "smooth+": _moveSmoothing = Mathf.Clamp(_moveSmoothing + 0.05f, 0f, 0.95f); _rotSmoothing = _moveSmoothing; break;
+                case "smooth-": _moveSmoothing = Mathf.Clamp(_moveSmoothing - 0.05f, 0f, 0.95f); _rotSmoothing = _moveSmoothing; break;
                 case "fov+": _fov = Mathf.Clamp(_fov + 5f, 10f, 120f); break;
                 case "fov-": _fov = Mathf.Clamp(_fov - 5f, 10f, 120f); break;
                 case "view": _goPro.Viewfinder = !_goPro.Viewfinder; break;
@@ -961,6 +988,15 @@ namespace GorillaCaster
             _watermarkText = GUILayout.TextField(_watermarkText, 40, GUILayout.Height(26));
             _watermarkOpacity = UI.Slider("Opacity", _watermarkOpacity, 0.25f, 1f);
             UI.Note("The watermark is always shown.");
+
+            UI.Header("VR Headset / Advanced");
+            _vrNametags = UI.Toggle("VR headset nametags (in-game)", _vrNametags);
+            if (_vrNametags)
+            {
+                _vrNametagVel = UI.Toggle("Show speed on VR nametags", _vrNametagVel);
+                _vrNametagSize = UI.Slider("VR nametag size", _vrNametagSize, 0.5f, 2.2f);
+            }
+            _rigLerp = UI.Slider("Player rig lerp (anim smooth)", _rigLerp, 0.2f, 2.5f);
 
             UI.Header("Movement Smoothing");
             _moveSmoothing = UI.Slider("Position", _moveSmoothing, 0f, 0.95f);

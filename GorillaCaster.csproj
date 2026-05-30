@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>GorillaCaster</AssemblyName>
     <Product>GorillaCaster</Product>
-    <Version>1.15.0</Version>
+    <Version>1.16.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
@@ -51,6 +51,7 @@
     <!-- Photon (join/leave rooms) -->
     <Reference Include="PhotonUnityNetworking"><HintPath>$(GameManaged)\PhotonUnityNetworking.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="PhotonRealtime"><HintPath>$(GameManaged)\PhotonRealtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Photon3Unity3D"><HintPath>$(GameManaged)\Photon3Unity3D.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 
   <!-- Copy the built plugin straight into BepInEx/plugins after every build -->
