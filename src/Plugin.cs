@@ -13,7 +13,7 @@ namespace GorillaCaster
     {
         public const string Guid = "com.forza.gorillacaster";
         public const string Name = "GorillaCaster";
-        public const string Version = "1.11.0";
+        public const string Version = "1.11.1";
 
         public static Plugin Instance { get; private set; }
 
@@ -24,7 +24,6 @@ namespace GorillaCaster
         public static ConfigEntry<float> DefaultFov;
         public static ConfigEntry<bool> NametagsDefault;
         public static ConfigEntry<bool> MinimapDefault;
-        public static ConfigEntry<bool> WatermarkEnabled;
         public static ConfigEntry<string> WatermarkText;
         public static ConfigEntry<float> WatermarkOpacity;
 
@@ -38,9 +37,8 @@ namespace GorillaCaster
             DefaultFov = Config.Bind("Camera", "DefaultFov", 90f, new ConfigDescription("Starting field of view.", new AcceptableValueRange<float>(10f, 120f)));
             NametagsDefault = Config.Bind("Overlays", "Nametags", true, "Show floating nametags over players by default.");
             MinimapDefault = Config.Bind("Overlays", "Minimap", false, "Show the overhead minimap by default.");
-            WatermarkEnabled = Config.Bind("Watermark", "Enabled", true, "Show the watermark.");
             WatermarkText = Config.Bind("Watermark", "Text", "Spooder's Camera Mod", "Watermark text.");
-            WatermarkOpacity = Config.Bind("Watermark", "Opacity", 0.55f, new ConfigDescription("Watermark opacity.", new AcceptableValueRange<float>(0f, 1f)));
+            WatermarkOpacity = Config.Bind("Watermark", "Opacity", 0.55f, new ConfigDescription("Watermark opacity (always shown).", new AcceptableValueRange<float>(0.25f, 1f)));
 
             var host = new GameObject("GorillaCaster");
             DontDestroyOnLoad(host);

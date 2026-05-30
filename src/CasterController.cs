@@ -94,8 +94,7 @@ namespace GorillaCaster
         private bool _letterbox, _hudHidden;
         private float _nametagScale = 1f;
 
-        // watermark
-        private bool _watermark = true;
+        // watermark (always shown — credit the creator)
         private string _watermarkText = "Spooder's Camera Mod";
         private float _watermarkOpacity = 0.55f;
 
@@ -119,7 +118,6 @@ namespace GorillaCaster
                 _fov = Plugin.DefaultFov != null ? Plugin.DefaultFov.Value : 90f;
                 if (Plugin.NametagsDefault != null) _nametags = Plugin.NametagsDefault.Value;
                 if (Plugin.MinimapDefault != null) _minimap = Plugin.MinimapDefault.Value;
-                if (Plugin.WatermarkEnabled != null) _watermark = Plugin.WatermarkEnabled.Value;
                 if (Plugin.WatermarkText != null) _watermarkText = Plugin.WatermarkText.Value;
                 if (Plugin.WatermarkOpacity != null) _watermarkOpacity = Plugin.WatermarkOpacity.Value;
                 WirePhone();
@@ -488,7 +486,7 @@ namespace GorillaCaster
                 Styles.Ensure();
                 Filters.Draw(_filter, _filterStrength, _vignette, _aspect, _thirds && !_hudHidden);
                 if (_letterbox) DrawLetterbox();
-                if (_watermark) HudExtras.DrawWatermark(_watermarkText, _watermarkOpacity);
+                HudExtras.DrawWatermark(_watermarkText, _watermarkOpacity);   // always on
                 if (!_hudHidden)
                 {
                     if (_nametags && _cam != null) HudExtras.DrawNametags(_rigs, _cam, _target, _nametagVelocity);
@@ -905,9 +903,9 @@ namespace GorillaCaster
             _nametagScale = UI.Slider("Nametag size", _nametagScale, 0.6f, 1.8f);
 
             UI.Header("Watermark");
-            _watermark = UI.Toggle("Show watermark", _watermark);
             _watermarkText = GUILayout.TextField(_watermarkText, 40, GUILayout.Height(26));
-            _watermarkOpacity = UI.Slider("Opacity", _watermarkOpacity, 0f, 1f);
+            _watermarkOpacity = UI.Slider("Opacity", _watermarkOpacity, 0.25f, 1f);
+            UI.Note("The watermark is always shown.");
 
             UI.Header("Movement Smoothing");
             _moveSmoothing = UI.Slider("Position", _moveSmoothing, 0f, 0.95f);
