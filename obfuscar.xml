@@ -28,5 +28,9 @@
     <!-- JSON-serialized preset classes: keep field names so presets.json stays human-editable -->
     <SkipType name="GorillaCaster.CamPreset" skipFields="true" skipProperties="true" />
     <SkipType name="GorillaCaster.PresetFile" skipFields="true" skipProperties="true" />
+    <!-- JSON-serialized dolly shots: keep field names so dolly.json stays human-editable -->
+    <SkipType name="GorillaCaster.DollyKey" skipFields="true" skipProperties="true" />
+    <SkipType name="GorillaCaster.DollyShot" skipFields="true" skipProperties="true" />
+    <SkipType name="GorillaCaster.DollyFile" skipFields="true" skipProperties="true" />
   </Module>
 </Obfuscator>

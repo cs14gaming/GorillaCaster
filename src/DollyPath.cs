@@ -37,6 +37,24 @@ namespace GorillaCaster
             _t = 0f;
         }
 
+        /// <summary>Snapshot the current keyframes for saving to disk.</summary>
+        public List<DollyKey> ExportKeys()
+        {
+            var list = new List<DollyKey>(_keys.Count);
+            foreach (var k in _keys) list.Add(new DollyKey { pos = k.pos, rot = k.rot });
+            return list;
+        }
+
+        /// <summary>Replace the path with a saved set of keyframes.</summary>
+        public void ImportKeys(List<DollyKey> keys)
+        {
+            _keys.Clear();
+            if (keys != null)
+                foreach (var k in keys) _keys.Add(new Key { pos = k.pos, rot = k.rot });
+            Playing = false;
+            _t = 0f;
+        }
+
         public void Play()
         {
             if (_keys.Count < 2) return;

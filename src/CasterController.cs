@@ -80,6 +80,9 @@ namespace GorillaCaster
         private int _presetIdx;
         private string _newPresetName = "My Preset";
 
+        // saved dolly shots
+        private List<DollyShot> _shots;
+
         // auto-director
         private bool _autoDirector;
 
@@ -129,6 +132,7 @@ namespace GorillaCaster
                 if (Plugin.WatermarkOpacity != null) _watermarkOpacity = Plugin.WatermarkOpacity.Value;
                 WirePhone();
                 _presets = Presets.Load();
+                _shots = DollyStore.Load();
             }
             catch { }
         }
@@ -879,6 +883,47 @@ namespace GorillaCaster
             GUILayout.EndHorizontal();
             _dolly.Loop = UI.Toggle("Loop", _dolly.Loop);
             _dolly.SecondsPerSegment = UI.Slider("Seconds / segment", _dolly.SecondsPerSegment, 0.3f, 8f, "0.0");
+
+            UI.Header("Saved Shots");
+            UI.Note("Reusable camera moves. Saved to BepInEx/config/GorillaCaster_dolly.json — rename them by hand too.");
+            GUILayout.BeginHorizontal();
+            if (UI.SmallButton("Save current", 130)) SaveCurrentShot();
+            if (UI.SmallButton("Reload file", 110)) { _shots = DollyStore.Load(); }
+            GUILayout.EndHorizontal();
+            if (_shots != null)
+            {
+                for (int i = 0; i < _shots.Count; i++)
+                {
+                    var s = _shots[i];
+                    GUILayout.BeginHorizontal();
+                    if (GUILayout.Button($"▶ {s.name}  <color=#9aa0a8>({s.keys.Count} keys)</color>", Styles.BtnS, GUILayout.Height(26)))
+                        LoadShot(s);
+                    if (UI.SmallButton("✕", 30)) { _shots.RemoveAt(i); DollyStore.Save(_shots); break; }
+                    GUILayout.EndHorizontal();
+                }
+            }
+        }
+
+        private void SaveCurrentShot()
+        {
+            if (_dolly.Count < 2) return;
+            if (_shots == null) _shots = new List<DollyShot>();
+            _shots.Add(new DollyShot
+            {
+                name = "Shot " + (_shots.Count + 1),
+                secondsPerSegment = _dolly.SecondsPerSegment,
+                loop = _dolly.Loop,
+                keys = _dolly.ExportKeys(),
+            });
+            DollyStore.Save(_shots);
+        }
+
+        private void LoadShot(DollyShot s)
+        {
+            if (s == null) return;
+            _dolly.ImportKeys(s.keys);
+            _dolly.SecondsPerSegment = s.secondsPerSegment;
+            _dolly.Loop = s.loop;
         }
 
         private void WorldTab()
