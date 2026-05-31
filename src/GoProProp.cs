@@ -110,7 +110,7 @@ namespace GorillaCaster
             // header bar
             MkImage(_canvas, "header", Round(), new Color(0.05f, 0.05f, 0.07f, 0.92f), 0, CH / 2f - 32, CW - 16, 56);
             MkImage(_canvas, "hdot", Round(), Pink, -CW * 0.5f + 50, CH / 2f - 32, 16, 16);
-            MkText(_canvas, "brand", "SPOODER  <color=#ff77bb>CAMERA</color>", 28, Color.white, 0, CH / 2f - 32, CW, 34, TextAnchor.MiddleCenter);
+            MkText(_canvas, "brand", "SPOODER  <color=#cfd2d8>CAMERA</color>", 28, Color.white, 0, CH / 2f - 32, CW, 34, TextAnchor.MiddleCenter);
             _accentBar = MkImage(_canvas, "accent", Round(), Pink, 0, CH / 2f - 62, CW - 40, 3);
 
             // footer bar
@@ -446,7 +446,7 @@ namespace GorillaCaster
         private static Sprite _round, _glow; private static Texture _grad, _vig;
         private static Sprite Round() { if (_round == null) { var t = TextureGen.RoundedRect(40, 16, Color.white); _round = Sprite.Create(t, new Rect(0, 0, 40, 40), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(16, 16, 16, 16)); } return _round; }
         private static Sprite Glow() { if (_glow == null) { var t = TextureGen.RoundedOutline(48, 18, 4, Color.white); _glow = Sprite.Create(t, new Rect(0, 0, 48, 48), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(18, 18, 18, 18)); } return _glow; }
-        private static Texture Grad() { if (_grad == null) _grad = TextureGen.Gradient(64, new Color(0.10f, 0.05f, 0.13f), new Color(0.06f, 0.08f, 0.14f)); return _grad; }
+        private static Texture Grad() { if (_grad == null) _grad = TextureGen.Gradient(64, new Color(0.085f, 0.088f, 0.098f), new Color(0.045f, 0.047f, 0.053f)); return _grad; }
         private static Texture Vig() { if (_vig == null) _vig = TextureGen.Vignette(96, new Color(0, 0, 0, 0.8f)); return _vig; }
         private static Font _font;
         private static Font F() { if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"); } catch { } if (_font == null) { try { _font = Resources.GetBuiltinResource<Font>("Arial.ttf"); } catch { } } } return _font; }

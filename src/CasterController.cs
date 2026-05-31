@@ -11,9 +11,9 @@ namespace GorillaCaster
 {
     /// <summary>
     /// Drives Gorilla Tag's third-person / shoulder camera (the desktop / spectator view) for
-    /// casting: six camera modes incl. a physical grabbable GoPro, cinematic dolly paths, an
-    /// instant-replay system, time-of-day control, and a full stream-overlay HUD. The VR
-    /// headset view is never touched.
+    /// casting: six camera modes incl. a physical grabbable tablet, cinematic dolly paths with
+    /// saved shots, time-of-day control, color grades, green screen, and a full stream-overlay
+    /// HUD with leaderboard. Settings persist between sessions. The VR headset view is never touched.
     /// </summary>
     public class CasterController : MonoBehaviour
     {
@@ -794,9 +794,11 @@ namespace GorillaCaster
             new[]{ "Right Ctrl", "Open / close menu" },
             new[]{ "P", "Cycle camera mode" },
             new[]{ "1-0 / N / B", "Cast player / cycle" },
+            new[]{ "Scroll", "Zoom FOV (any mode)" },
             new[]{ "Q / E", "Orbit (Follow)" },
             new[]{ "K / L", "Dolly keyframe / play" },
             new[]{ "[ / ]", "Previous / next preset" },
+            new[]{ "A (right)", "Summon / hide tablet" },
             new[]{ "F8", "Hide all overlays" },
             new[]{ "F1", "This cheatsheet" },
             new[]{ "F11", "Screenshot" },
@@ -829,6 +831,7 @@ namespace GorillaCaster
             Styles.Round(new Rect(0, 0, W, 34), new Color(0.035f, 0.04f, 0.052f, 1f), 14f);
             Styles.Round(new Rect(14, 12, 9, 9), Styles.Accent, 4.5f);
             GUI.Label(new Rect(30, 8, 320, 22), "Spooder's <color=#e8eaee>Camera Mod</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
+            GUI.Label(new Rect(W - 220, 10, 180, 18), "Right Ctrl to toggle", new GUIStyle(Styles.Sub) { alignment = TextAnchor.MiddleRight, fontSize = 10 });
             if (GUI.Button(new Rect(W - 32, 7, 24, 22), "✕", Styles.BtnS)) { _menuOpen = false; SettingsStore.Save(CaptureSettings()); }
 
             // sidebar rail
