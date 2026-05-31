@@ -55,6 +55,35 @@ namespace GorillaCaster
 
         public static Texture2D Circle(int size, Color col) => RoundedRect(size, size / 2, col);
 
+        /// <summary>A stylised banana crescent (transparent background), tilted ~40°.
+        /// Built as the area inside one disc and outside an offset disc.</summary>
+        public static Texture2D Banana(int size, Color light, Color dark)
+        {
+            var t = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            float c = (size - 1) / 2f;
+            float ca = Mathf.Cos(-40f * Mathf.Deg2Rad), sa = Mathf.Sin(-40f * Mathf.Deg2Rad);
+            // discs in normalised, rotated space
+            Vector2 bigC = new Vector2(-0.05f, -0.12f); float bigR = 0.92f;
+            Vector2 cutC = new Vector2(0.02f, 0.46f); float cutR = 0.90f;
+            float edge = 2.2f / size;   // ~1px feather
+            for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++)
+            {
+                float nx = (x - c) / c, ny = (y - c) / c;
+                float rx = nx * ca - ny * sa, ry = nx * sa + ny * ca;
+                float d1 = Vector2.Distance(new Vector2(rx, ry), bigC);
+                float d2 = Vector2.Distance(new Vector2(rx, ry), cutC);
+                float aOuter = Mathf.Clamp01((bigR - d1) / edge);
+                float aInner = Mathf.Clamp01((d2 - cutR) / edge);
+                float a = Mathf.Min(aOuter, aInner);
+                Color col = Color.Lerp(dark, light, Mathf.Clamp01((ry + 0.6f) / 1.2f)); // darker lower edge
+                t.SetPixel(x, y, new Color(col.r, col.g, col.b, a));
+            }
+            t.Apply();
+            t.hideFlags = HideFlags.HideAndDontSave; t.wrapMode = TextureWrapMode.Clamp; t.filterMode = FilterMode.Bilinear;
+            return t;
+        }
+
         /// <summary>Vertical gradient (bottom -> top).</summary>
         public static Texture2D Gradient(int h, Color bottom, Color top)
         {

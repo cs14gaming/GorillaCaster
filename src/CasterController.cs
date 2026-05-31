@@ -148,6 +148,7 @@ namespace GorillaCaster
                 WirePhone();
                 _presets = Presets.Load();
                 _shots = DollyStore.Load();
+                CheatDatabase.EnsureLoaded();
                 ApplySettings(SettingsStore.Load());   // restore last-used setup
             }
             catch { }
@@ -293,6 +294,7 @@ namespace GorillaCaster
             _goPro.ActiveCmd = _mode == CamMode.FirstPerson ? "fp" : _mode == CamMode.Selfie ? "selfie" : "";
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
+            ModChecker.Update(_rigs, Time.deltaTime);
             VrNametags.Enabled = _vrNametags; VrNametags.ShowVelocity = _vrNametagVel; VrNametags.Size = _vrNametagSize;
             VrNametags.Tick(_rigs);
             ApplyRigLerp();

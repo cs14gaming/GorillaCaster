@@ -68,11 +68,9 @@ namespace GorillaCaster
             if (Root != null) return;
             Root = new GameObject("SpooderPhone") { hideFlags = HideFlags.DontSave };
 
-            float w = CW * S, h = CH * S, t = 0.01f;
-            // body + glowing pink trim + camera bump
-            Box(Root.transform, Vector3.zero, new Vector3(w + 0.014f, h + 0.014f, t), new Color(0.04f, 0.045f, 0.06f));
-            Box(Root.transform, new Vector3(0, 0, -t * 0.5f), new Vector3(w + 0.02f, h + 0.02f, 0.002f), Pink * 1.4f, true);   // glow trim
-            Box(Root.transform, new Vector3(w * 0.36f, h * 0.34f, -0.009f), new Vector3(0.03f, 0.03f, 0.01f), new Color(0.02f, 0.02f, 0.03f)); // camera bump
+            float w = CW * S, h = CH * S, t = 0.008f;
+            // thin aluminium core — inset so the rounded front bezel + back panel define the silhouette (iPad look)
+            Box(Root.transform, Vector3.zero, new Vector3(w - 0.006f, h - 0.006f, t), new Color(0.22f, 0.23f, 0.25f));
 
             var lensGo = new GameObject("Lens");
             lensGo.transform.SetParent(Root.transform, false);
@@ -82,6 +80,7 @@ namespace GorillaCaster
 
             BuildAudio();
             BuildCanvas();
+            BuildBack(t);
             BuildViewfinder();
             BuildLaser();
 
@@ -89,6 +88,41 @@ namespace GorillaCaster
             if (_preview != null) { SetLayer(_preview.gameObject, 0); _preview.cullingMask = ~(1 << UiLayer); }
             _popT = 0f; Held = false;
             SetPage(0);
+        }
+
+        // The iPad-style back: rounded aluminium panel, a corner camera module, and a centred banana logo.
+        private void BuildBack(float t)
+        {
+            var go = new GameObject("Back", typeof(Canvas));
+            go.transform.SetParent(Root.transform, false);
+            go.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
+            var back = (RectTransform)go.transform;
+            back.sizeDelta = new Vector2(CW, CH);
+            back.localPosition = new Vector3(0, 0, -(t * 0.5f + 0.0012f));
+            back.localRotation = Quaternion.Euler(0, 180f, 0);   // face away from the screen, reads un-mirrored from behind
+            back.localScale = new Vector3(S, S, S);
+
+            // aluminium back panel (defines the rounded silhouette from behind) + a faint top sheen
+            MkImage(back, "panel", Round(), new Color(0.27f, 0.285f, 0.31f, 1f), 0, 0, CW + 30, CH + 30);
+            MkImage(back, "sheen", Round(), new Color(1f, 1f, 1f, 0.05f), 0, CH * 0.22f, CW - 40, CH * 0.45f);
+
+            // centred banana logo with a soft glow behind
+            MkImage(back, "bglow", Disc(), new Color(1f, 0.85f, 0.2f, 0.12f), 0, 0, 250, 250).type = Image.Type.Simple;
+            MkImage(back, "blogo", BananaSprite(), Color.white, 0, 0, 200, 200).type = Image.Type.Simple;
+
+            // iPad-Pro-style camera module in a corner: square bump, 3 lenses, flash, LiDAR
+            float mx = -CW / 2f + 124, my = CH / 2f - 112;
+            MkImage(back, "cammod", Round(), new Color(0.13f, 0.135f, 0.15f, 1f), mx, my, 152, 152);
+            Lens2(back, mx - 30, my + 30); Lens2(back, mx + 30, my + 30); Lens2(back, mx - 30, my - 30);
+            MkImage(back, "flash", Disc(), new Color(0.95f, 0.93f, 0.8f, 0.92f), mx + 30, my - 30, 28, 28).type = Image.Type.Simple;
+            MkImage(back, "lidar", Disc(), new Color(0.05f, 0.05f, 0.07f, 1f), mx + 54, my + 54, 18, 18).type = Image.Type.Simple;
+        }
+
+        private void Lens2(RectTransform back, float x, float y)
+        {
+            MkImage(back, "lensring", Disc(), new Color(0.22f, 0.23f, 0.26f, 1f), x, y, 58, 58).type = Image.Type.Simple;
+            MkImage(back, "lens", Disc(), new Color(0.03f, 0.03f, 0.05f, 1f), x, y, 46, 46).type = Image.Type.Simple;
+            MkImage(back, "glint", Disc(), new Color(0.30f, 0.45f, 0.70f, 0.55f), x - 8, y + 8, 13, 13).type = Image.Type.Simple;
         }
 
         private void BuildCanvas()
@@ -102,7 +136,10 @@ namespace GorillaCaster
             _canvas.localPosition = new Vector3(0, 0, 0.0085f);
             _canvas.localScale = new Vector3(-S, S, S);
 
-            // gradient background (dark purple -> dark blue)
+            // rounded bezel behind the screen so the front silhouette reads like a real iPad
+            MkImage(_canvas, "bezel", Round(), new Color(0.055f, 0.058f, 0.066f, 1f), 0, 0, CW + 34, CH + 34);
+
+            // gradient background (screen)
             var bg = MkRaw(_canvas, "bg", 0, 0, CW, CH);
             bg.texture = Grad();
             bg.color = Color.white;
@@ -199,7 +236,7 @@ namespace GorillaCaster
             {
                 if (reps != null && i < reps.Count)
                 {
-                    _modRows[i].text = reps[i].name + "   <color=#9fb2c4>" + reps[i].detail + "</color>";
+                    _modRows[i].text = "<b>" + reps[i].name + "</b>   <size=18>" + reps[i].detail + "</size>";
                     _modRows[i].color = reps[i].color;
                     _modRows[i].gameObject.SetActive(true);
                 }
@@ -443,8 +480,10 @@ namespace GorillaCaster
 
         // ============================================================ uGUI helpers
 
-        private static Sprite _round, _glow; private static Texture _grad, _vig;
+        private static Sprite _round, _glow, _circle, _banana; private static Texture _grad, _vig;
         private static Sprite Round() { if (_round == null) { var t = TextureGen.RoundedRect(40, 16, Color.white); _round = Sprite.Create(t, new Rect(0, 0, 40, 40), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(16, 16, 16, 16)); } return _round; }
+        private static Sprite Disc() { if (_circle == null) { var t = TextureGen.Circle(64, Color.white); _circle = Sprite.Create(t, new Rect(0, 0, 64, 64), new Vector2(0.5f, 0.5f), 100f); } return _circle; }
+        private static Sprite BananaSprite() { if (_banana == null) { var t = TextureGen.Banana(128, new Color(1f, 0.84f, 0.18f), new Color(0.80f, 0.58f, 0.07f)); _banana = Sprite.Create(t, new Rect(0, 0, 128, 128), new Vector2(0.5f, 0.5f), 100f); } return _banana; }
         private static Sprite Glow() { if (_glow == null) { var t = TextureGen.RoundedOutline(48, 18, 4, Color.white); _glow = Sprite.Create(t, new Rect(0, 0, 48, 48), new Vector2(0.5f, 0.5f), 100f, 0, SpriteMeshType.FullRect, new Vector4(18, 18, 18, 18)); } return _glow; }
         private static Texture Grad() { if (_grad == null) _grad = TextureGen.Gradient(64, new Color(0.085f, 0.088f, 0.098f), new Color(0.045f, 0.047f, 0.053f)); return _grad; }
         private static Texture Vig() { if (_vig == null) _vig = TextureGen.Vignette(96, new Color(0, 0, 0, 0.8f)); return _vig; }
