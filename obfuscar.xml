@@ -32,5 +32,7 @@
     <SkipType name="GorillaCaster.DollyKey" skipFields="true" skipProperties="true" />
     <SkipType name="GorillaCaster.DollyShot" skipFields="true" skipProperties="true" />
     <SkipType name="GorillaCaster.DollyFile" skipFields="true" skipProperties="true" />
+    <!-- JSON-serialized full settings blob: keep field names so settings.json stays human-editable -->
+    <SkipType name="GorillaCaster.CasterSettings" skipFields="true" skipProperties="true" />
   </Module>
 </Obfuscator>

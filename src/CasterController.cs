@@ -31,6 +31,7 @@ namespace GorillaCaster
         private VRRig _target;
 
         // tunables
+        private const float MaxFov = 150f;     // allow true fisheye
         private float _fov = 90f;
         private float _nearClip = 0.05f;
         private float _fpNearClip = 0.30f;     // first-person clip (secondary)
@@ -53,6 +54,11 @@ namespace GorillaCaster
         private bool _collision = true;
         private float _collisionRadius = 0.18f;
         private float _roll = 0f;
+        private bool _rollLock = false;        // keep the horizon level (cancel inherited roll)
+        private bool _angleClamp = false;      // clamp first-person look pitch (Pokruk-style)
+        private float _fpMaxPitch = 75f;
+        private float _shake = 0f;             // handheld camera-shake amount (0..1)
+        private float _shakeSeed;
         private float _selfieDist = 0.6f;
         private Vector3 _tripodPos;
         private bool _tripodSet;
@@ -95,6 +101,14 @@ namespace GorillaCaster
         private float _vrNametagSize = 1f;
         private float _rigLerp = 1f;
 
+        // leaderboard + green screen
+        private bool _leaderboard;
+        private bool _greenScreen;
+        private Color _greenColor = new Color(0f, 0.7f, 0.1f);
+        private CameraClearFlags _savedClearFlags;
+        private Color _savedBg;
+        private bool _bgSaved;
+
         // toggles
         private bool _menuOpen;
         private bool _autoCast;
@@ -125,6 +139,7 @@ namespace GorillaCaster
         {
             try
             {
+                _shakeSeed = UnityEngine.Random.value * 100f;
                 _fov = Plugin.DefaultFov != null ? Plugin.DefaultFov.Value : 90f;
                 if (Plugin.NametagsDefault != null) _nametags = Plugin.NametagsDefault.Value;
                 if (Plugin.MinimapDefault != null) _minimap = Plugin.MinimapDefault.Value;
@@ -133,9 +148,63 @@ namespace GorillaCaster
                 WirePhone();
                 _presets = Presets.Load();
                 _shots = DollyStore.Load();
+                ApplySettings(SettingsStore.Load());   // restore last-used setup
             }
             catch { }
         }
+
+        private void OnDestroy()
+        {
+            try { SettingsStore.Save(CaptureSettings()); } catch { }
+        }
+
+        // ----- full-settings persistence -----
+        private void ApplySettings(CasterSettings s)
+        {
+            if (s == null) return;
+            _fov = s.fov; _nearClip = s.nearClip; _fpNearClip = s.fpNearClip;
+            _fpHideSelf = s.fpHideSelf; _fpHideCosmetics = s.fpHideCosmetics; _fpOffset = s.fpOffset;
+            _followDistance = s.followDistance; _followHeight = s.followHeight; _followLead = s.followLead;
+            _moveSmoothing = s.moveSmoothing; _rotSmoothing = s.rotSmoothing; _freeSpeed = s.freeSpeed;
+            _orbit = s.orbit; _orbitSpeed = s.orbitSpeed; _orbitPitch = s.orbitPitch;
+            _collision = s.collision; _collisionRadius = s.collisionRadius;
+            _roll = s.roll; _rollLock = s.rollLock; _angleClamp = s.angleClamp; _fpMaxPitch = s.fpMaxPitch;
+            _shake = s.shake; _selfieDist = s.selfieDist;
+            _goProStabilize = s.goProStabilize; _goProAutoLevel = s.goProAutoLevel;
+            _filter = s.filter; _aspect = s.aspect; _filterStrength = s.filterStrength; _vignette = s.vignette;
+            _thirds = s.thirds; _crosshair = s.crosshair; _letterbox = s.letterbox;
+            _greenScreen = s.greenScreen; _greenColor = s.greenColor;
+            _nametags = s.nametags; _nametagVelocity = s.nametagVelocity; _minimap = s.minimap;
+            _lowerThird = s.lowerThird; _playerList = s.playerList; _hud = s.hud;
+            _nametagOcclude = s.nametagOcclude; _nametagScale = s.nametagScale; _leaderboard = s.leaderboard;
+            _vrNametags = s.vrNametags; _vrNametagVel = s.vrNametagVel; _vrNametagSize = s.vrNametagSize;
+            _rigLerp = s.rigLerp; _watermarkOpacity = s.watermarkOpacity;
+            _autoCast = s.autoCast; _autoDirector = s.autoDirector; _keepAfk = s.keepAfk;
+            _mode = (CamMode)Mathf.Clamp(s.mode, 0, ModeNames.Length - 1);
+        }
+
+        private CasterSettings CaptureSettings() => new CasterSettings
+        {
+            mode = (int)_mode,
+            fov = _fov, nearClip = _nearClip, fpNearClip = _fpNearClip,
+            fpHideSelf = _fpHideSelf, fpHideCosmetics = _fpHideCosmetics, fpOffset = _fpOffset,
+            followDistance = _followDistance, followHeight = _followHeight, followLead = _followLead,
+            moveSmoothing = _moveSmoothing, rotSmoothing = _rotSmoothing, freeSpeed = _freeSpeed,
+            orbit = _orbit, orbitSpeed = _orbitSpeed, orbitPitch = _orbitPitch,
+            collision = _collision, collisionRadius = _collisionRadius,
+            roll = _roll, rollLock = _rollLock, angleClamp = _angleClamp, fpMaxPitch = _fpMaxPitch,
+            shake = _shake, selfieDist = _selfieDist,
+            goProStabilize = _goProStabilize, goProAutoLevel = _goProAutoLevel,
+            filter = _filter, aspect = _aspect, filterStrength = _filterStrength, vignette = _vignette,
+            thirds = _thirds, crosshair = _crosshair, letterbox = _letterbox,
+            greenScreen = _greenScreen, greenColor = _greenColor,
+            nametags = _nametags, nametagVelocity = _nametagVelocity, minimap = _minimap,
+            lowerThird = _lowerThird, playerList = _playerList, hud = _hud,
+            nametagOcclude = _nametagOcclude, nametagScale = _nametagScale, leaderboard = _leaderboard,
+            vrNametags = _vrNametags, vrNametagVel = _vrNametagVel, vrNametagSize = _vrNametagSize,
+            rigLerp = _rigLerp, watermarkOpacity = _watermarkOpacity,
+            autoCast = _autoCast, autoDirector = _autoDirector, keepAfk = _keepAfk,
+        };
 
         private void Update()
         {
@@ -179,7 +248,7 @@ namespace GorillaCaster
             Key modeKey = Plugin.ModeKey != null ? Plugin.ModeKey.Value : Key.P;
             Key shotKey = Plugin.ScreenshotKey != null ? Plugin.ScreenshotKey.Value : Key.F11;
 
-            if (Pressed(menuKey)) _menuOpen = !_menuOpen;
+            if (Pressed(menuKey)) { _menuOpen = !_menuOpen; if (!_menuOpen) SettingsStore.Save(CaptureSettings()); }
             if (!EnsureCamera()) return;
 
             if (Pressed(modeKey)) CycleMode();
@@ -197,6 +266,14 @@ namespace GorillaCaster
 
             if (Pressed(Key.LeftBracket)) CyclePreset(-1);
             if (Pressed(Key.RightBracket)) CyclePreset(1);
+
+            // mouse-scroll zoom works in every mode
+            var ms = Mouse.current;
+            if (ms != null)
+            {
+                float scroll = ms.scroll.ReadValue().y;
+                if (Mathf.Abs(scroll) > 0.01f) _fov = Mathf.Clamp(_fov - scroll * 0.02f, 10f, MaxFov);
+            }
 
             // A button (right primary) summons / dismisses the tablet
             var cip = ControllerInputPoller.instance;
@@ -232,11 +309,12 @@ namespace GorillaCaster
         {
             if (_cam == null) return;
             if (_goPro.Spawned) _cam.cullingMask &= ~(1 << _goPro.Layer);   // never broadcast the tablet UI to the monitor
+            ApplyGreenScreen();
             _cam.fieldOfView = _fov;
             _cam.nearClipPlane = (_mode == CamMode.FirstPerson && _fpHideSelf) ? _fpNearClip : _nearClip;
 
             if (_dolly.Playing) { _dolly.Tick(_cam.transform, Time.deltaTime); return; }
-            if (_mode == CamMode.FreeCam) { FreeCamMove(); return; }
+            if (_mode == CamMode.FreeCam) { FreeCamMove(); PostProcessCam(); return; }
             _freeInit = false;
 
             // GoPro = follow the physical prop's lens
@@ -256,6 +334,7 @@ namespace GorillaCaster
                     }
                     else _cam.transform.SetPositionAndRotation(p, rot);
                 }
+                PostProcessCam();
                 return;
             }
 
@@ -268,7 +347,7 @@ namespace GorillaCaster
                 case CamMode.FirstPerson:
                     Transform fpSrc = LocalFpSource() ?? head;   // Pokruk-style: smooth Camera Follower for local player
                     desiredPos = fpSrc.TransformPoint(_fpOffset);
-                    desiredRot = fpSrc.rotation;
+                    desiredRot = _angleClamp ? ClampPitch(fpSrc.rotation, _fpMaxPitch) : fpSrc.rotation;
                     if (_fpHideCosmetics && !FirstPerson.Hidden) FirstPerson.Hide();
                     break;
                 case CamMode.Selfie:
@@ -310,6 +389,48 @@ namespace GorillaCaster
             float pk = SmoothK(_moveSmoothing), rk = SmoothK(_rotSmoothing);
             _cam.transform.position = Vector3.Lerp(_cam.transform.position, desiredPos, pk);
             _cam.transform.rotation = Quaternion.Slerp(_cam.transform.rotation, desiredRot, rk);
+            PostProcessCam();
+        }
+
+        // Level the horizon and/or add cinematic handheld shake to the final camera pose.
+        private void PostProcessCam()
+        {
+            if (_cam == null) return;
+            var t = _cam.transform;
+            if (_rollLock) t.rotation = Quaternion.LookRotation(t.forward, Vector3.up);
+            if (_shake > 0.001f)
+            {
+                float time = Time.unscaledTime * (1.4f + _shake * 2.2f);
+                float nx = Mathf.PerlinNoise(_shakeSeed, time) - 0.5f;
+                float ny = Mathf.PerlinNoise(_shakeSeed + 11.3f, time) - 0.5f;
+                float nz = Mathf.PerlinNoise(_shakeSeed + 23.7f, time) - 0.5f;
+                t.rotation *= Quaternion.Euler(nx * _shake * 2.2f, ny * _shake * 2.2f, nz * _shake * 1.4f);
+                t.position += (t.right * nx + t.up * ny) * _shake * 0.02f;
+            }
+        }
+
+        private static Quaternion ClampPitch(Quaternion q, float max)
+        {
+            Vector3 e = q.eulerAngles;
+            float p = e.x > 180f ? e.x - 360f : e.x;
+            return Quaternion.Euler(Mathf.Clamp(p, -max, max), e.y, e.z);
+        }
+
+        // Swap the camera's clear to a flat color for chroma-key editing; restore when off.
+        private void ApplyGreenScreen()
+        {
+            if (_greenScreen)
+            {
+                if (!_bgSaved) { _savedClearFlags = _cam.clearFlags; _savedBg = _cam.backgroundColor; _bgSaved = true; }
+                _cam.clearFlags = CameraClearFlags.SolidColor;
+                _cam.backgroundColor = _greenColor;
+            }
+            else if (_bgSaved)
+            {
+                _cam.clearFlags = _savedClearFlags;
+                _cam.backgroundColor = _savedBg;
+                _bgSaved = false;
+            }
         }
 
         private static bool kbHeld(Key k) { var kb = Keyboard.current; return kb != null && kb[k].isPressed; }
@@ -378,12 +499,6 @@ namespace GorillaCaster
             if (kb.spaceKey.isPressed) move += Vector3.up;
             if (kb.leftCtrlKey.isPressed) move -= Vector3.up;
             t.position += move * speed;
-
-            if (mouse != null)
-            {
-                float scroll = mouse.scroll.ReadValue().y;
-                if (Mathf.Abs(scroll) > 0.01f) _fov = Mathf.Clamp(_fov - scroll * 0.02f, 10f, 120f);
-            }
         }
 
         // ============================================================ players / replay
@@ -509,8 +624,8 @@ namespace GorillaCaster
                 case "selfie": SetMode(CamMode.Selfie); break;
                 case "smooth+": _moveSmoothing = Mathf.Clamp(_moveSmoothing + 0.05f, 0f, 0.95f); _rotSmoothing = _moveSmoothing; break;
                 case "smooth-": _moveSmoothing = Mathf.Clamp(_moveSmoothing - 0.05f, 0f, 0.95f); _rotSmoothing = _moveSmoothing; break;
-                case "fov+": _fov = Mathf.Clamp(_fov + 5f, 10f, 120f); break;
-                case "fov-": _fov = Mathf.Clamp(_fov - 5f, 10f, 120f); break;
+                case "fov+": _fov = Mathf.Clamp(_fov + 5f, 10f, MaxFov); break;
+                case "fov-": _fov = Mathf.Clamp(_fov - 5f, 10f, MaxFov); break;
                 case "view": _goPro.Viewfinder = !_goPro.Viewfinder; break;
                 case "orbit": _orbit = !_orbit; break;
                 case "fp": SetMode(CamMode.FirstPerson); break;
@@ -583,6 +698,7 @@ namespace GorillaCaster
                     if (_minimap) HudExtras.DrawMinimap(new Rect(Screen.width - 210, 40, 200, 160), _rigs, _target);
                     if (_hud) DrawHud();
                     if (_playerList) DrawPlayerList();
+                    if (_leaderboard) DrawLeaderboard();
                     _comp.Draw(_rigs);
                     if (_lowerThird && _target != null) DrawLowerThird();
                     if (_crosshair) DrawCrosshair();
@@ -620,6 +736,31 @@ namespace GorillaCaster
                 st.normal.textColor = sel ? Color.green : (it ? new Color(1f, 0.5f, 0.5f) : Color.white);
                 GUI.Label(new Rect(20, y - 2, 240, 18), $"[{(i + 1) % 10}] {CasterUtil.NameOf(r)}" + (it ? "  [IT]" : ""), st);
                 y += 18;
+            }
+        }
+
+        private readonly List<VRRig> _lbSort = new List<VRRig>();
+        private void DrawLeaderboard()
+        {
+            if (_rigs.Count == 0) return;
+            _lbSort.Clear(); _lbSort.AddRange(_rigs);
+            _lbSort.Sort((a, b) => CasterUtil.Speed(b).CompareTo(CasterUtil.Speed(a)));
+            int n = Mathf.Min(_lbSort.Count, 8);
+            float w = 196, rowH = 21;
+            var r = new Rect(Screen.width - w - 10, _minimap ? 208 : 40, w, 28 + n * rowH);
+            Styles.DrawCard(r, new Color(0.07f, 0.08f, 0.10f, 0.92f), 10f);
+            Styles.Round(new Rect(r.x, r.y, r.width, 3), Styles.Accent, 1.5f);
+            GUI.Label(new Rect(r.x + 12, r.y + 6, w, 18), "LEADERBOARD  <size=9>· m/s</size>", Styles.Header);
+            float y = r.y + 28;
+            for (int i = 0; i < n; i++)
+            {
+                var rig = _lbSort[i]; bool it = CasterUtil.IsTagged(rig);
+                Styles.Fill(new Rect(r.x + 10, y + 4, 8, 12), rig.playerColor);
+                var st = new GUIStyle(Styles.Hud) { fontSize = 12 };
+                st.normal.textColor = it ? Styles.Accent2 : Color.white;
+                GUI.Label(new Rect(r.x + 24, y, w - 66, 18), $"{i + 1}. {CasterUtil.NameOf(rig)}" + (it ? "  [IT]" : ""), st);
+                GUI.Label(new Rect(r.x + w - 46, y, 38, 18), $"{CasterUtil.Speed(rig):0.0}", new GUIStyle(st) { alignment = TextAnchor.MiddleRight });
+                y += rowH;
             }
         }
 
@@ -688,7 +829,7 @@ namespace GorillaCaster
             Styles.Round(new Rect(0, 0, W, 34), new Color(0.035f, 0.04f, 0.052f, 1f), 14f);
             Styles.Round(new Rect(14, 12, 9, 9), Styles.Accent, 4.5f);
             GUI.Label(new Rect(30, 8, 320, 22), "Spooder's <color=#e8eaee>Camera Mod</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
-            if (GUI.Button(new Rect(W - 32, 7, 24, 22), "✕", Styles.BtnS)) _menuOpen = false;
+            if (GUI.Button(new Rect(W - 32, 7, 24, 22), "✕", Styles.BtnS)) { _menuOpen = false; SettingsStore.Save(CaptureSettings()); }
 
             // sidebar rail
             float railW = 132, top = 44;
@@ -732,13 +873,13 @@ namespace GorillaCaster
             int m = GUILayout.SelectionGrid((int)_mode, ModeNames, 3, Styles.BtnS, GUILayout.Height(58));
             if (m != (int)_mode) SetMode((CamMode)m);
 
-            UI.Header("Lens");
-            _fov = UI.Slider("Field of View", _fov, 10f, 120f, "0");
+            UI.Header("Lens  ·  scroll to zoom");
+            _fov = UI.Slider("Field of View", _fov, 10f, MaxFov, "0");
             GUILayout.BeginHorizontal();
-            if (UI.SmallButton("110", 56)) _fov = 110;
-            if (UI.SmallButton("90", 56)) _fov = 90;
-            if (UI.SmallButton("60", 56)) _fov = 60;
-            if (UI.SmallButton("35", 56)) _fov = 35;
+            if (UI.SmallButton("Fisheye", 70)) _fov = 130;
+            if (UI.SmallButton("Wide", 60)) _fov = 100;
+            if (UI.SmallButton("Normal", 64)) _fov = 70;
+            if (UI.SmallButton("Tele", 56)) _fov = 30;
             GUILayout.EndHorizontal();
             _nearClip = UI.Slider("Near Clip", _nearClip, 0.01f, 0.6f);
 
@@ -764,6 +905,8 @@ namespace GorillaCaster
                 _fpOffset.z = UI.Slider("Offset Z (forward)", _fpOffset.z, -0.2f, 0.4f);
                 _fpHideSelf = UI.Toggle("Also clip near plane", _fpHideSelf);
                 if (_fpHideSelf) _fpNearClip = UI.Slider("Clip strength", _fpNearClip, 0.1f, 0.6f);
+                _angleClamp = UI.Toggle("Angle clamp (limit look pitch)", _angleClamp);
+                if (_angleClamp) _fpMaxPitch = UI.Slider("Max pitch", _fpMaxPitch, 30f, 89f, "0");
             }
             else if (_mode == CamMode.Selfie)
             {
@@ -784,7 +927,9 @@ namespace GorillaCaster
             UI.Header("Rig");
             _collision = UI.Toggle("Camera collision (no wall clip)", _collision);
             if (_collision) _collisionRadius = UI.Slider("Collision radius", _collisionRadius, 0.05f, 0.5f);
-            _roll = UI.Slider("Dutch roll", _roll, -45f, 45f, "0");
+            _rollLock = UI.Toggle("Roll lock (keep horizon level)", _rollLock);
+            if (!_rollLock) _roll = UI.Slider("Dutch roll", _roll, -45f, 45f, "0");
+            _shake = UI.Slider("Handheld shake", _shake, 0f, 1f);
             if (UI.Button("Frame all players")) FrameAll();
 
             GUILayout.Space(6);
@@ -825,7 +970,7 @@ namespace GorillaCaster
             _goPro.Viewfinder = UI.Toggle("Live viewfinder screen", _goPro.Viewfinder);
             _goProAutoLevel = UI.Toggle("Auto-level horizon", _goProAutoLevel);
             _goProStabilize = UI.Slider("Stabilization", _goProStabilize, 0f, 0.92f);
-            _fov = UI.Slider("Camera FOV", _fov, 10f, 120f, "0");
+            _fov = UI.Slider("Camera FOV", _fov, 10f, MaxFov, "0");
             UI.Note("On-screen buttons: REC · MODE · FOV-/FOV+ · VIEW · TIME. Stabilization smooths shaky hands; auto-level keeps the horizon flat.");
 
             UI.Header("How to use");
@@ -991,6 +1136,21 @@ namespace GorillaCaster
             _aspect = GUILayout.SelectionGrid(_aspect, Filters.AspectNames, 3, Styles.BtnS, GUILayout.Height(56));
             _thirds = UI.Toggle("Rule-of-thirds grid", _thirds);
             UI.Note("Aspect guides letterbox/pillarbox the view for cinematic or vertical clips. Grade & vignette apply to the broadcast (monitor) only.");
+
+            UI.Header("Green Screen");
+            _greenScreen = UI.Toggle("Solid color background", _greenScreen);
+            if (_greenScreen)
+            {
+                _greenColor.r = UI.Slider("Red", _greenColor.r, 0f, 1f);
+                _greenColor.g = UI.Slider("Green", _greenColor.g, 0f, 1f);
+                _greenColor.b = UI.Slider("Blue", _greenColor.b, 0f, 1f);
+                GUILayout.BeginHorizontal();
+                if (UI.SmallButton("Green", 70)) _greenColor = new Color(0f, 0.7f, 0.1f);
+                if (UI.SmallButton("Blue", 60)) _greenColor = new Color(0.04f, 0.2f, 0.85f);
+                if (UI.SmallButton("Black", 64)) _greenColor = Color.black;
+                GUILayout.EndHorizontal();
+            }
+            UI.Note("Replaces the sky behind the action with a flat color for chroma-key editing.");
         }
 
         private void PresetsTab()
@@ -1023,6 +1183,7 @@ namespace GorillaCaster
             UI.Header("Overlays  ·  F8 hides all");
             _lowerThird = UI.Toggle("Now-casting lower third", _lowerThird);
             _playerList = UI.Toggle("Player list", _playerList);
+            _leaderboard = UI.Toggle("Speed leaderboard", _leaderboard);
             _nametags = UI.Toggle("Floating nametags", _nametags);
             _nametagOcclude = UI.Toggle("Hide nametags behind walls", _nametagOcclude);
             _nametagVelocity = UI.Toggle("Speed on nametags", _nametagVelocity);
