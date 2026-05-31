@@ -9,15 +9,15 @@ namespace GorillaCaster
     {
         private static bool _built;
 
-        // palette
-        public static readonly Color Accent = new Color(0.27f, 0.78f, 1f);     // cyan
-        public static readonly Color Accent2 = new Color(1f, 0.30f, 0.55f);    // magenta
-        public static readonly Color BgCol = new Color(0.066f, 0.074f, 0.094f, 0.99f);
-        public static readonly Color RailCol = new Color(0.045f, 0.050f, 0.066f, 1f);
-        public static readonly Color CardCol = new Color(0.108f, 0.120f, 0.150f, 1f);
-        public static readonly Color PanelCol = new Color(0.140f, 0.156f, 0.190f, 1f);
-        public static readonly Color PanelHi = new Color(0.200f, 0.222f, 0.270f, 1f);
-        public static readonly Color SubText = new Color(0.62f, 0.68f, 0.77f);
+        // palette — clean monochrome (black / grey / white) with a red alert accent
+        public static readonly Color Accent = new Color(0.95f, 0.96f, 0.97f);   // white
+        public static readonly Color Accent2 = new Color(0.86f, 0.32f, 0.36f);  // red (alerts / IT)
+        public static readonly Color BgCol = new Color(0.055f, 0.056f, 0.060f, 0.99f);
+        public static readonly Color RailCol = new Color(0.038f, 0.039f, 0.042f, 1f);
+        public static readonly Color CardCol = new Color(0.094f, 0.096f, 0.102f, 1f);
+        public static readonly Color PanelCol = new Color(0.135f, 0.138f, 0.146f, 1f);
+        public static readonly Color PanelHi = new Color(0.205f, 0.210f, 0.222f, 1f);
+        public static readonly Color SubText = new Color(0.60f, 0.62f, 0.66f);
 
         // textures
         public static Texture2D White, Card, Btn, BtnHi, BtnAccent, Pill, TrackTex, ThumbTex, Shadow, RailPillTex, SwitchOn, SwitchOff, Knob, TagBg, TagGlow;

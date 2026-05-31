@@ -61,7 +61,7 @@ namespace GorillaCaster
 
                 bool flagged = flags.Count > 0;
                 string detail = (platform.Length > 0 ? platform + "  ·  " : "") + $"{speed:0} m/s  ·  " + (flagged ? string.Join(" ", flags) : "clean");
-                Color col = flagged ? new Color(1f, 0.42f, 0.42f) : new Color(0.7f, 0.86f, 1f);
+                Color col = flagged ? new Color(0.86f, 0.32f, 0.36f) : new Color(0.80f, 0.82f, 0.86f);
                 list.Add(new ModReport { name = name, detail = detail, color = col });
             }
             return list;

@@ -53,9 +53,11 @@ namespace GorillaCaster
         public int Layer => UiLayer;
         private const float CW = 960f, CH = 480f, S = 0.00050f;
 
-        private static readonly Color Pink = new Color(0.86f, 0.31f, 0.6f);
-        private static readonly Color PinkDim = new Color(0.5f, 0.22f, 0.42f);
-        private static readonly Color PinkLite = new Color(1f, 0.55f, 0.82f);
+        // monochrome theme: dark grey buttons, white accent/glow
+        private static readonly Color Pink = new Color(0.165f, 0.168f, 0.180f);    // primary button
+        private static readonly Color PinkDim = new Color(0.108f, 0.110f, 0.122f); // secondary button
+        private static readonly Color PinkLite = new Color(0.95f, 0.96f, 0.98f);   // white accent / glow
+        private static readonly Color Special = new Color(0.225f, 0.230f, 0.250f); // mods/flip buttons
 
         private class Btn { public RectTransform rt; public Image img, glow; public Vector2 c, half; public Action act; public Color col; public int page; public string cmd; public bool isFlip; public float scale = 1f, flash, hover; }
 
@@ -113,7 +115,7 @@ namespace GorillaCaster
 
             // footer bar
             MkImage(_canvas, "footer", Round(), new Color(0.05f, 0.05f, 0.07f, 0.92f), 0, -CH / 2f + 26, CW - 16, 44);
-            _footer = MkText(_canvas, "fstatus", "", 22, new Color(0.85f, 0.9f, 1f), 0, -CH / 2f + 26, CW, 28, TextAnchor.MiddleCenter);
+            _footer = MkText(_canvas, "fstatus", "", 22, new Color(0.90f, 0.92f, 0.95f), 0, -CH / 2f + 26, CW, 28, TextAnchor.MiddleCenter);
             _status = _footer;
 
             // ---------- CAMERA PAGE ----------
@@ -267,8 +269,8 @@ namespace GorillaCaster
             _laser.useWorldSpace = true; _laser.positionCount = 2; _laser.numCapVertices = 4;
             _laser.startWidth = 0.004f; _laser.endWidth = 0.004f;
             _laser.material = new Material(Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color"));
-            _laser.startColor = new Color(1f, 0.5f, 0.75f, 0.9f);
-            _laser.endColor = new Color(1f, 0.5f, 0.75f, 0.2f);
+            _laser.startColor = new Color(0.95f, 0.96f, 0.98f, 0.9f);
+            _laser.endColor = new Color(0.95f, 0.96f, 0.98f, 0.15f);
             _laser.enabled = false;
         }
 

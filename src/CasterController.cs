@@ -600,7 +600,7 @@ namespace GorillaCaster
         {
             string spd = _target != null ? $" · {CasterUtil.Speed(_target):0.0} m/s" : "";
             string extra = _mode == CamMode.GoPro ? (_goPro.Held ? " · HELD" : " · placed") : (_dolly.Playing ? " · DOLLY" : "");
-            GUI.Label(new Rect(12, 10, 420, 22), $"<color=#5cc8ff>●</color> {_fps:0} FPS · {_mode}{spd}{extra}", Styles.Hud);
+            GUI.Label(new Rect(12, 10, 420, 22), $"<color=#ffffff>●</color> {_fps:0} FPS · {_mode}{spd}{extra}", Styles.Hud);
         }
 
         private void DrawPlayerList()
@@ -628,7 +628,7 @@ namespace GorillaCaster
             Styles.Round(new Rect(r.x + 6, r.y + 8, 7f, r.height - 16), _target.playerColor, 3.5f);
             Styles.Round(new Rect(r.x + 16, r.yMax - 5f, r.width - 32, 3f), it ? Styles.Accent2 : Styles.Accent, 1.5f);
             GUI.Label(new Rect(r.x + 24, r.y + 8, r.width - 30, 30), CasterUtil.NameOf(_target), Styles.LowerThirdName);
-            string sub = it ? "<color=#ff4d8d>● IT</color>   NOW CASTING" : "NOW CASTING";
+            string sub = it ? "<color=#db4d58>● IT</color>   NOW CASTING" : "NOW CASTING";
             GUI.Label(new Rect(r.x + 24, r.y + 38, r.width - 30, 20), sub, Styles.LowerThirdSub);
         }
 
@@ -683,7 +683,7 @@ namespace GorillaCaster
             // title bar
             Styles.Round(new Rect(0, 0, W, 34), new Color(0.035f, 0.04f, 0.052f, 1f), 14f);
             Styles.Round(new Rect(14, 12, 9, 9), Styles.Accent, 4.5f);
-            GUI.Label(new Rect(30, 8, 320, 22), "Spooder's <color=#46c8ff>Camera Mod</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
+            GUI.Label(new Rect(30, 8, 320, 22), "Spooder's <color=#e8eaee>Camera Mod</color>  <size=10>v" + Plugin.Version + "</size>", Styles.Brand);
             if (GUI.Button(new Rect(W - 32, 7, 24, 22), "✕", Styles.BtnS)) _menuOpen = false;
 
             // sidebar rail
@@ -808,7 +808,7 @@ namespace GorillaCaster
             UI.Note("A real in-VR phone with a live viewfinder and on-screen buttons. Grab it with GRIP, then poke the screen with your free hand to record, change mode, FOV, viewfinder and time — control everything without the PC.");
 
             GUILayout.Space(2);
-            GUILayout.Label(_goPro.Spawned ? (_goPro.Held ? "Status:  <color=#5cf08a>● held</color>" : "Status:  <color=#46c8ff>● placed</color>") : "Status:  not spawned", Styles.Hud);
+            GUILayout.Label(_goPro.Spawned ? (_goPro.Held ? "Status:  <color=#ffffff>● held</color>" : "Status:  <color=#9aa0a8>● placed</color>") : "Status:  not spawned", Styles.Hud);
 
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
@@ -840,7 +840,7 @@ namespace GorillaCaster
                 var r = _rigs[i]; bool sel = r == _target;
                 GUILayout.BeginHorizontal();
                 Styles.Fill(GUILayoutUtility.GetRect(10, 22, GUILayout.Width(10)), r.playerColor);
-                string tag = CasterUtil.IsTagged(r) ? "  <color=#ff5577>[IT]</color>" : "";
+                string tag = CasterUtil.IsTagged(r) ? "  <color=#db4d58>[IT]</color>" : "";
                 var st = new GUIStyle(Styles.BtnS); if (sel) st.normal.textColor = new Color(0.36f, 0.94f, 0.54f);
                 if (GUILayout.Button($"[{(i + 1) % 10}] {CasterUtil.NameOf(r)}{tag}" + (sel ? "  ◄" : ""), st, GUILayout.Height(26)))
                     SelectIndex(i);

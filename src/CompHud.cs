@@ -96,10 +96,10 @@ namespace GorillaCaster
                 float yy = ShowTimer ? r.y + 64 : r.y + 36;
                 var s = new GUIStyle(Styles.Hud) { fontSize = 14, alignment = TextAnchor.MiddleCenter, richText = true };
                 GUI.Label(new Rect(r.x, yy, r.width, 18),
-                    $"<color=#7fe0a0>SURVIVORS {survivors}</color>    <color=#ff5577>INFECTED {infected}</color>", s);
+                    $"<color=#e8eaee>SURVIVORS {survivors}</color>    <color=#db4d58>INFECTED {infected}</color>", s);
                 if (itName != null)
                     GUI.Label(new Rect(r.x, yy + 18, r.width, 14),
-                        $"<color=#9fb2c4>IT:</color> {itName}", new GUIStyle(s) { fontSize = 11 });
+                        $"<color=#9aa0a8>IT:</color> {itName}", new GUIStyle(s) { fontSize = 11 });
             }
 
             // team scores
@@ -107,7 +107,7 @@ namespace GorillaCaster
             {
                 var ts = new GUIStyle(Styles.Hud) { fontSize = 16, alignment = TextAnchor.MiddleCenter };
                 GUI.Label(new Rect(r.x, r.yMax - 26, r.width, 20),
-                    $"<color=#5cc8ff>{TeamAName} {TeamA}</color>   —   <color=#ff5577>{TeamB} {TeamBName}</color>",
+                    $"<color=#e8eaee>{TeamAName} {TeamA}</color>   —   <color=#db4d58>{TeamB} {TeamBName}</color>",
                     new GUIStyle(ts) { richText = true });
             }
         }
