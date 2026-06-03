@@ -34,6 +34,7 @@ namespace GorillaCaster
         public bool lowerThird = true, playerList = true, hud = true;
         public bool nametagOcclude = true; public float nametagScale = 1f;
         public bool leaderboard = false;
+        public bool tagFeed = true;
         public bool vrNametags = false, vrNametagVel = false; public float vrNametagSize = 1f;
         public float rigLerp = 1f, watermarkOpacity = 0.55f;
         // behaviour

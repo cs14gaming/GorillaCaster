@@ -1,6 +1,6 @@
 {
   "name": "GorillaCaster",
-  "version_number": "1.23.0",
+  "version_number": "1.24.0",
   "website_url": "https://github.com/cs14gaming/GorillaCaster",
   "description": "The most complete free Gorilla Tag casting mod: in-VR iPad-style control tablet, live viewfinder, 6 camera modes, cinematic dolly, color grades, green screen, leaderboard, comp timer, and a multi-signal mod checker.",
   "dependencies": [

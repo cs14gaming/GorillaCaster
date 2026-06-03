@@ -101,6 +101,13 @@ namespace GorillaCaster
         private float _vrNametagSize = 1f;
         private float _rigLerp = 1f;
 
+        // tag feed (live "now IT" feed for casting)
+        private bool _tagFeed = true;
+        private class TagEvent { public string text; public float time; }
+        private readonly List<TagEvent> _tagEvents = new List<TagEvent>();
+        private readonly HashSet<VRRig> _wasIt = new HashSet<VRRig>();
+        private readonly HashSet<VRRig> _nowIt = new HashSet<VRRig>();
+
         // leaderboard + green screen
         private bool _leaderboard;
         private bool _greenScreen;
@@ -177,7 +184,7 @@ namespace GorillaCaster
             _greenScreen = s.greenScreen; _greenColor = s.greenColor;
             _nametags = s.nametags; _nametagVelocity = s.nametagVelocity; _minimap = s.minimap;
             _lowerThird = s.lowerThird; _playerList = s.playerList; _hud = s.hud;
-            _nametagOcclude = s.nametagOcclude; _nametagScale = s.nametagScale; _leaderboard = s.leaderboard;
+            _nametagOcclude = s.nametagOcclude; _nametagScale = s.nametagScale; _leaderboard = s.leaderboard; _tagFeed = s.tagFeed;
             _vrNametags = s.vrNametags; _vrNametagVel = s.vrNametagVel; _vrNametagSize = s.vrNametagSize;
             _rigLerp = s.rigLerp; _watermarkOpacity = s.watermarkOpacity;
             _autoCast = s.autoCast; _autoDirector = s.autoDirector; _keepAfk = s.keepAfk;
@@ -201,7 +208,7 @@ namespace GorillaCaster
             greenScreen = _greenScreen, greenColor = _greenColor,
             nametags = _nametags, nametagVelocity = _nametagVelocity, minimap = _minimap,
             lowerThird = _lowerThird, playerList = _playerList, hud = _hud,
-            nametagOcclude = _nametagOcclude, nametagScale = _nametagScale, leaderboard = _leaderboard,
+            nametagOcclude = _nametagOcclude, nametagScale = _nametagScale, leaderboard = _leaderboard, tagFeed = _tagFeed,
             vrNametags = _vrNametags, vrNametagVel = _vrNametagVel, vrNametagSize = _vrNametagSize,
             rigLerp = _rigLerp, watermarkOpacity = _watermarkOpacity,
             autoCast = _autoCast, autoDirector = _autoDirector, keepAfk = _keepAfk,
@@ -283,8 +290,9 @@ namespace GorillaCaster
                 bool a = cip.rightControllerPrimaryButton;
                 if (a && !_aPrev)
                 {
-                    if (_goPro.Spawned) { _goPro.Despawn(); SetMode(CamMode.FirstPerson); }
-                    else { _goPro.SummonToHand(); SetMode(CamMode.GoPro); }
+                    if (!_goPro.Spawned) { _goPro.SummonToHand(); SetMode(CamMode.GoPro); }
+                    else if (!_goPro.Held) { _goPro.Despawn(); SetMode(CamMode.FirstPerson); }
+                    // while the tablet is held you're using it — ignore A so it can't be closed by accident
                 }
                 _aPrev = a;
             }
@@ -295,6 +303,7 @@ namespace GorillaCaster
             _goPro.Tick(_fov);
             _comp.Update(Time.deltaTime, _rigs);
             ModChecker.Update(_rigs, Time.deltaTime);
+            UpdateTagFeed();
             VrNametags.Enabled = _vrNametags; VrNametags.ShowVelocity = _vrNametagVel; VrNametags.Size = _vrNametagSize;
             VrNametags.Tick(_rigs);
             ApplyRigLerp();
@@ -701,6 +710,7 @@ namespace GorillaCaster
                     if (_hud) DrawHud();
                     if (_playerList) DrawPlayerList();
                     if (_leaderboard) DrawLeaderboard();
+                    if (_tagFeed) DrawTagFeed();
                     _comp.Draw(_rigs);
                     if (_lowerThird && _target != null) DrawLowerThird();
                     if (_crosshair) DrawCrosshair();
@@ -763,6 +773,40 @@ namespace GorillaCaster
                 GUI.Label(new Rect(r.x + 24, y, w - 66, 18), $"{i + 1}. {CasterUtil.NameOf(rig)}" + (it ? "  [IT]" : ""), st);
                 GUI.Label(new Rect(r.x + w - 46, y, 38, 18), $"{CasterUtil.Speed(rig):0.0}", new GUIStyle(st) { alignment = TextAnchor.MiddleRight });
                 y += rowH;
+            }
+        }
+
+        // ----- tag feed (new in this update) -----
+        private void UpdateTagFeed()
+        {
+            _nowIt.Clear();
+            for (int i = 0; i < _rigs.Count; i++)
+            {
+                var r = _rigs[i];
+                if (r == null || !CasterUtil.IsTagged(r)) continue;
+                _nowIt.Add(r);
+                if (!_wasIt.Contains(r))
+                    _tagEvents.Add(new TagEvent { text = CasterUtil.NameOf(r) + " is now IT", time = Time.time });
+            }
+            _wasIt.Clear();
+            foreach (var r in _nowIt) _wasIt.Add(r);
+            _tagEvents.RemoveAll(e => Time.time - e.time > 7f);
+            if (_tagEvents.Count > 6) _tagEvents.RemoveRange(0, _tagEvents.Count - 6);
+        }
+
+        private void DrawTagFeed()
+        {
+            if (_tagEvents.Count == 0) return;
+            float y = Screen.height * 0.42f;
+            for (int i = _tagEvents.Count - 1; i >= 0; i--)
+            {
+                var e = _tagEvents[i];
+                float a = Mathf.Clamp01((7f - (Time.time - e.time)) / 1.5f);
+                Styles.Round(new Rect(12, y + 5, 7, 7), new Color(0.86f, 0.30f, 0.34f, a), 3.5f);
+                var s = new GUIStyle(Styles.Hud) { fontSize = 13, fontStyle = FontStyle.Bold };
+                s.normal.textColor = new Color(0.95f, 0.96f, 0.98f, a);
+                GUI.Label(new Rect(26, y, 320, 18), e.text, s);
+                y += 22;
             }
         }
 
@@ -1189,6 +1233,7 @@ namespace GorillaCaster
             _lowerThird = UI.Toggle("Now-casting lower third", _lowerThird);
             _playerList = UI.Toggle("Player list", _playerList);
             _leaderboard = UI.Toggle("Speed leaderboard", _leaderboard);
+            _tagFeed = UI.Toggle("Tag feed (live IT feed)", _tagFeed);
             _nametags = UI.Toggle("Floating nametags", _nametags);
             _nametagOcclude = UI.Toggle("Hide nametags behind walls", _nametagOcclude);
             _nametagVelocity = UI.Toggle("Speed on nametags", _nametagVelocity);

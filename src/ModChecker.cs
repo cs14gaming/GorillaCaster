@@ -107,11 +107,14 @@ namespace GorillaCaster
             Dictionary<int, Player> players = null;
             try { if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null) players = PhotonNetwork.CurrentRoom.Players; }
             catch { }
+            VRRig local = null;
+            try { if (GorillaTagger.Instance != null) local = GorillaTagger.Instance.offlineVRRig; } catch { }
 
             for (int i = 0; i < rigs.Count; i++)
             {
                 var rig = rigs[i];
                 if (rig == null) continue;
+                bool isLocal = rig == local;
                 _states.TryGetValue(rig, out State st);
 
                 var flags = new List<string>();
@@ -120,33 +123,36 @@ namespace GorillaCaster
 
                 float speed = CasterUtil.Speed(rig);
 
-                if (st != null)
+                // physics/rig heuristics — only for REMOTE players, and only after a few seconds of
+                // samples so lag spikes and freshly-joined players don't get false-flagged. Thresholds
+                // are conservative: only truly impossible values read as CHEAT, the rest are SUS watch-flags.
+                bool ready = st != null && st.since > 2.5f;
+                if (ready && !isLocal)
                 {
-                    if (st.ewmaSpeed > 25f || speed > 32f) Flag("SPEED", Verdict.Cheat);
-                    else if (st.ewmaSpeed > 16f) Flag("SPEED?", Verdict.Sus);
+                    if (st.ewmaSpeed > 28f || speed > 42f) Flag("SPEED", Verdict.Cheat);
+                    else if (st.ewmaSpeed > 18f) Flag("SPEED?", Verdict.Sus);
 
-                    if (st.teleports >= 2) Flag("TELEPORT", Verdict.Cheat);
-                    else if (st.teleports == 1) Flag("WARP?", Verdict.Sus);
+                    if (st.teleports >= 3) Flag("TELEPORT", Verdict.Cheat);
+                    else if (st.teleports >= 1) Flag("WARP?", Verdict.Sus);
 
-                    if (st.flyTicks >= 12) Flag("FLY", Verdict.Cheat);
-                    else if (st.flyTicks >= 6) Flag("FLY?", Verdict.Sus);
+                    if (st.flyTicks >= 20) Flag("FLY", Verdict.Cheat);
+                    else if (st.flyTicks >= 10) Flag("FLY?", Verdict.Sus);
 
-                    if (st.maxArm > 2.0f) Flag("PULL", Verdict.Cheat);
-                    else if (st.maxArm > 1.3f) Flag(CasterUtil.IsTagged(rig) ? "REACH" : "STRETCH", Verdict.Sus);
+                    if (st.maxArm > 2.2f) Flag("PULL", Verdict.Cheat);
+                    else if (st.maxArm > 1.4f) Flag(CasterUtil.IsTagged(rig) ? "REACH?" : "STRETCH?", Verdict.Sus);
 
-                    if (st.glideTicks >= 36) Flag("PSA", Verdict.Sus);
+                    if (st.glideTicks >= 48) Flag("PSA", Verdict.Sus);
+
+                    float sc = RigScale(rig);
+                    if (sc > 2.2f || sc < 0.28f) Flag("SCALE", Verdict.Sus);
+                    try
+                    {
+                        Color c = rig.playerColor;
+                        if (c.r > 1.01f || c.g > 1.01f || c.b > 1.01f || c.r < -0.01f || c.g < -0.01f || c.b < -0.01f)
+                            Flag("COLOR", Verdict.Cheat);
+                    }
+                    catch { }
                 }
-
-                // scale + impossible colour
-                float sc = RigScale(rig);
-                if (sc > 2.0f || sc < 0.3f) Flag("SCALE", Verdict.Sus);
-                try
-                {
-                    Color c = rig.playerColor;
-                    if (c.r > 1.01f || c.g > 1.01f || c.b > 1.01f || c.r < -0.01f || c.g < -0.01f || c.b < -0.01f)
-                        Flag("COLOR", Verdict.Cheat);
-                }
-                catch { }
 
                 // custom-property cheat signatures (cosmetic spoofers / named menus)
                 string platform = "";

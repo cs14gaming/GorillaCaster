@@ -8,8 +8,9 @@ namespace GorillaCaster
     /// <summary>
     /// The in-VR camera phone (Sakuraa-style, glow-up): wide body, gradient theme, header/footer bars,
     /// a rounded glowing screen that mirrors the live broadcast with a viewfinder overlay, and a pink
-    /// icon button-grid (First Person / Selfie / Flip / FOV / smoothing / shot / mods). Grab with grip,
-    /// aim the right-hand fingertip laser, pull trigger. Mod-check board on page 2.
+    /// icon button-grid (First Person / Selfie / Flip / FOV / smoothing / shot / mods). Grab with grip;
+    /// the pointer beams out of your free hand and follows where you point — pull trigger to click.
+    /// Mod-check board on page 2.
     /// </summary>
     internal class GoProProp
     {
@@ -45,7 +46,7 @@ namespace GorillaCaster
         private Vector3 _localPos;
         private Quaternion _localRot;
         private Vector2 _smoothLp;
-        private Vector3 _aimOrigin, _aimDir;
+        private Vector3 _aimDir;
         private int _hoverIdx = -1, _lastHoverSound = -1, _hoverPrev = -1;
         private bool _trigPrev;
         private const float GrabRadius = 0.42f;
@@ -365,24 +366,30 @@ namespace GorillaCaster
                     holding = _hand;
                 }
                 _hoverIdx = -1;
-                bool ray = false;
-                if (holding != 0 && rh != null) ray = LaserRight(rh, poller.rightControllerTriggerButton);
-                if (_laser != null) _laser.enabled = ray;
-                if (_cursor != null && _cursor.gameObject.activeSelf != ray) _cursor.gameObject.SetActive(ray);
+                bool hit = false;
+                // the pointer comes out of whichever hand is NOT holding the tablet (defaults to right)
+                Transform freeHand; Transform freeTip; bool freeTrig;
+                if (holding == 0) { freeHand = lh; freeTip = TriggerTip(true); freeTrig = poller.leftControllerTriggerButton; }
+                else { freeHand = rh; freeTip = TriggerTip(false); freeTrig = poller.rightControllerTriggerButton; }
+                if (freeHand != null) hit = Laser(freeHand, freeTip, freeTrig);
+                if (_laser != null) _laser.enabled = freeHand != null;          // always show the beam so it's easy to aim
+                if (_cursor != null && _cursor.gameObject.activeSelf != hit) _cursor.gameObject.SetActive(hit);
             }
 
             if (_page == 1) { _modTimer += Time.deltaTime; if (_modTimer > 0.75f) { _modTimer = 0f; RefreshMods(); } }
             Animate();
         }
 
-        private bool LaserRight(Transform rh, bool trigger)
+        private bool Laser(Transform hand, Transform tip, bool trigger)
         {
-            Transform tip = Tip();
-            Vector3 liveOrigin = tip != null ? tip.position : rh.position;
-            Vector3 liveDir = tip != null ? (tip.position - rh.position).normalized : rh.forward;
-            if (liveDir.sqrMagnitude < 0.0001f) liveDir = rh.forward;
-            if (!trigger || _aimDir.sqrMagnitude < 0.0001f) { _aimOrigin = liveOrigin; _aimDir = liveDir; }
-            Vector3 origin = _aimOrigin, dir = _aimDir;
+            // the beam emits from the hand and follows where the finger points (live, lightly smoothed)
+            Vector3 origin = hand.position;
+            Vector3 dir = tip != null ? (tip.position - hand.position) : hand.forward;
+            if (dir.sqrMagnitude < 1e-5f) dir = hand.forward;
+            dir.Normalize();
+            if (_aimDir.sqrMagnitude < 1e-5f) _aimDir = dir;
+            _aimDir = Vector3.Slerp(_aimDir, dir, 0.45f).normalized;
+            dir = _aimDir;
 
             Vector3 nrm = _canvas.transform.forward, cpos = _canvas.position;
             float denom = Vector3.Dot(dir, nrm);
@@ -476,7 +483,7 @@ namespace GorillaCaster
 
         private static Vector3 HeadPos() { var t = HeadTransform(); return t != null ? t.position : Vector3.zero; }
         private static Transform HeadTransform() { var t = GorillaTagger.Instance; if (t != null && t.mainCamera != null) return t.mainCamera.transform; return Camera.main != null ? Camera.main.transform : null; }
-        private static Transform Tip() { var t = GorillaTagger.Instance; if (t == null) return null; return t.rightHandTriggerCollider != null ? t.rightHandTriggerCollider.transform : null; }
+        private static Transform TriggerTip(bool left) { var t = GorillaTagger.Instance; if (t == null) return null; var c = left ? t.leftHandTriggerCollider : t.rightHandTriggerCollider; return c != null ? c.transform : null; }
 
         // ============================================================ uGUI helpers
 

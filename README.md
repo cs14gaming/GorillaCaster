@@ -22,7 +22,9 @@ and full obfuscation.
   - **Tablet** – a **real in-VR iPad** running a camera app: a **live viewfinder screen** and
     **poke-able on-screen buttons**. Hold it in one hand and tap the screen with the other to
     control the mod **without the PC**. Squeeze **grip** to pick it up (or press **A** to
-    summon/dismiss). Modern rounded body with a camera module and banana logo on the back.
+    summon/dismiss — it won't close while you're holding it). The **pointer beams out of your
+    free hand and follows where you point**; pull the trigger to click. Modern rounded body with
+    a camera module and banana logo on the back.
   - **Tripod** – plant a static camera anywhere; it stays put and auto-tracks the cast player.
   - **Selfie** – sits in front of the player's face looking back.
 - **Lens** – FOV slider (10–150°) with **scroll-to-zoom in any mode**, FOV presets
@@ -37,6 +39,7 @@ and full obfuscation.
 - **Competitive overlay** – Infection **round timer** (3:00 cap with colour states) + live
   **scoreboard** (survivors vs infected, who's IT), plus optional manual **team scores**.
 - **Speed leaderboard** – sorted live ranking of every player by speed.
+- **Tag feed** – a live "now IT" feed in the corner so casters never miss a tag.
 - **Color grade, green screen & framing** – 8 filter looks + strength, vignette, a **green-screen**
   background (RGB pickers) for chroma-key editing, **aspect guides** (16:9 / 2.39 / 4:3 / 9:16 /
   1:1) with letterboxing, rule-of-thirds grid, center crosshair.
