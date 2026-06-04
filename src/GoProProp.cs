@@ -46,7 +46,7 @@ namespace GorillaCaster
         private Vector3 _localPos;
         private Quaternion _localRot;
         private Vector2 _smoothLp;
-        private Vector3 _aimDir;
+        private Vector3 _localAim;   // aim direction stored in the hand's local space (stays straight)
         private int _hoverIdx = -1, _lastHoverSound = -1, _hoverPrev = -1;
         private bool _trigPrev;
         private const float GrabRadius = 0.42f;
@@ -382,14 +382,22 @@ namespace GorillaCaster
 
         private bool Laser(Transform hand, Transform tip, bool trigger)
         {
-            // the beam emits from the hand and follows where the finger points (live, lightly smoothed)
+            // The beam emits from the hand and stays STRAIGHT — it's locked to the hand's orientation,
+            // not the fingertip, so curling your finger to pull the trigger never bends it. The aim is
+            // only re-learned while the trigger is UP (finger extended = natural pointing); the instant
+            // you press, it's frozen rigid to the hand so the click lands where you aimed.
             Vector3 origin = hand.position;
-            Vector3 dir = tip != null ? (tip.position - hand.position) : hand.forward;
-            if (dir.sqrMagnitude < 1e-5f) dir = hand.forward;
-            dir.Normalize();
-            if (_aimDir.sqrMagnitude < 1e-5f) _aimDir = dir;
-            _aimDir = Vector3.Slerp(_aimDir, dir, 0.45f).normalized;
-            dir = _aimDir;
+            if (!trigger && tip != null)
+            {
+                Vector3 wd = tip.position - hand.position;
+                if (wd.sqrMagnitude > 1e-5f)
+                {
+                    Vector3 targetLocal = (Quaternion.Inverse(hand.rotation) * wd.normalized).normalized;
+                    _localAim = _localAim.sqrMagnitude < 1e-5f ? targetLocal : Vector3.Slerp(_localAim, targetLocal, 0.2f).normalized;
+                }
+            }
+            if (_localAim.sqrMagnitude < 1e-5f) _localAim = Vector3.forward;
+            Vector3 dir = (hand.rotation * _localAim).normalized;
 
             Vector3 nrm = _canvas.transform.forward, cpos = _canvas.position;
             float denom = Vector3.Dot(dir, nrm);
